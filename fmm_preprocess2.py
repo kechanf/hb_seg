@@ -2,7 +2,7 @@ import numpy as np
 import heapq
 import os
 import tifffile
-from fmm_preprocess import get_soma
+from nnunetv2.training.loss.fmm_preprocess import get_soma, simple_get_soma
 import scipy.sparse as sp
 from scipy.sparse import coo_matrix
 import matplotlib.pyplot as plt
@@ -217,6 +217,17 @@ def get_fmm(tif_path, fmm_folder, path_folder, temp_path, debug=False):
         tifffile.imwrite(distance_image_path, distance_image)
     valid_points, valid_values = get_predecessor_info(predecessor_image)
     save_predecessor_info(valid_points, valid_values, predecessor_image_path)
+
+def get_fmm_from_img(img, temp_path=r"/home/kfchen/temp_tif"):
+    # rand path
+    random_path = np.random.randint(0, 100000) + (img.shape[0] * img.shape[1] * img.shape[2])
+    source = simple_get_soma(img, str(random_path), temp_path=temp_path)
+    distance_image, predecessor_image = compute_fast_marching(img, source)
+    return predecessor_image
+    # distance_image = np.where(distance_image, 1/distance_image, 0)
+    # Normalize the distance image to [0, 255] and save it as a uint8 image
+    # valid_points, valid_values = get_predecessor_info(predecessor_image)
+    # save_predecessor_info(valid_points, valid_values, predecessor_image_path)
 
 
 if __name__ == '__main__':
