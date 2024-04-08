@@ -129,7 +129,7 @@ def npathloss(gt, pred, predecessor, num_paths=10, soma=None, debug=False, thres
 
         # print(f"torch.sum(ptls1) * torch.sum(ptls2) {torch.sum(ptls1)} {torch.sum(ptls2)}")
 
-        pt_loss = pt_loss + torch.sum(ptls1) * torch.sum(ptls2)
+        pt_loss = pt_loss + (torch.sum(ptls1) + 1e-6) * (torch.sum(ptls2) + 1e-6)
 
 
     if(debug):
@@ -141,7 +141,7 @@ def npathloss(gt, pred, predecessor, num_paths=10, soma=None, debug=False, thres
 
 
 
-    
+
 
 
 
