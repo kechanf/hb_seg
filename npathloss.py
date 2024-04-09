@@ -82,7 +82,7 @@ def random_foreground_points(image, m):
 
     return points
 
-def npathloss(gt, pred, predecessor, num_paths=10, soma=None, debug=False, threshold=0.5):
+def npathloss(gt, pred, predecessor, num_paths=10, soma=None, debug=False, threshold=0.5, smooth = 1e-6):
     gt_clone = gt.detach().clone().cpu().numpy()
     pred_clone = pred.detach().clone().cpu().numpy()
     predecessor_clone = predecessor.detach().clone().cpu().numpy()
@@ -129,7 +129,7 @@ def npathloss(gt, pred, predecessor, num_paths=10, soma=None, debug=False, thres
 
         # print(f"torch.sum(ptls1) * torch.sum(ptls2) {torch.sum(ptls1)} {torch.sum(ptls2)}")
 
-        pt_loss = pt_loss + (torch.sum(ptls1) + 1e-6) * (torch.sum(ptls2) + 1e-6)
+        pt_loss = pt_loss + (torch.sum(ptls1) + smooth) * (torch.sum(ptls2) + smooth)
 
 
     if(debug):
@@ -138,21 +138,4 @@ def npathloss(gt, pred, predecessor, num_paths=10, soma=None, debug=False, thres
 
 
     return pt_loss
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
