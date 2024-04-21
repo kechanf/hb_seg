@@ -1,11 +1,16 @@
-from nnunetv2.training.loss.fmm_preprocess2 import find_path_to_source, mip_and_path_visualization
-import numpy as np
-import cc3d
-from scipy.ndimage.morphology import binary_dilation, binary_erosion
-from scipy.ndimage import label
 import time
+
+import cc3d
+import numpy as np
 import tifffile
 import torch
+from scipy.ndimage import label
+from scipy.ndimage.morphology import binary_dilation
+
+from nnunetv2.training.loss.fmm_preprocess2 import find_path_to_source, mip_and_path_visualization
+import os
+from nnunetv2.training.loss.fmm.fmm_path import calculate_path_loss_mask
+
 
 def soma_cc_ndimage(image, source):
     """
@@ -30,6 +35,7 @@ def soma_cc_ndimage(image, source):
 
     return connected_component
 
+
 def soma_cc_cc3d(image, source):
     """
     Finds the connected component containing the source point in a 3D image.
@@ -43,7 +49,7 @@ def soma_cc_cc3d(image, source):
       component containing the source point is marked as 1, and the rest is 0.
     """
     # Label all connected components in the image
-    labeled_image = cc3d.connected_components(image, connectivity=6)
+    labeled_image = cc3d.connected_components(image, connectivity=26)
 
     # Find the label of the connected component that contains the source point
     source_label = labeled_image[source]
@@ -82,14 +88,50 @@ def random_foreground_points(image, m):
 
     return points
 
-def npathloss(gt, pred, predecessor, num_paths=10, soma=None, debug=False, threshold=0.5, smooth = 1e-6):
+
+def find_foreground_points(binary_image):
+    """
+    Finds the coordinates of the foreground points in a 3D binary image.
+
+    Parameters:
+    - binary_image: A 3D numpy array representing a binary image, where foreground points are denoted by 1.
+
+    Returns:
+    - A list of tuples, where each tuple represents the (x, y, z) coordinates of a foreground point.
+    """
+    # Ensure the input is a 3D numpy array
+    if binary_image.ndim != 3:
+        raise ValueError("Input image must be a 3D numpy array.")
+
+    # Find indices where the value is 1 (foreground points)
+    foreground_coords = np.argwhere(binary_image == 1)
+
+    # Convert indices to list of tuples
+    foreground_points = [tuple(coord) for coord in foreground_coords]
+
+    return foreground_points
+
+def npathloss(gt, pred, seg, predecessor, num_paths=10, soma=None, debug=False, threshold=0.5, smooth=1e-6):
+    if(soma is None or predecessor is None):
+        return 0
+
+    # print(num_paths)
     gt_clone = gt.detach().clone().cpu().numpy()
     pred_clone = pred.detach().clone().cpu().numpy()
     predecessor_clone = predecessor.detach().clone().cpu().numpy()
     soma_clone = soma.detach().clone().cpu().numpy()
     soma_clone = tuple([int(soma_clone[0]), int(soma_clone[1]), int(soma_clone[2])])
-
-    bin_pred = (pred_clone > threshold).astype(int)
+    if(soma_clone[0] + soma_clone[1] + soma_clone[2] == 0):
+        # print('fuck0')
+        return 0
+    # print(f"max {max(seg.flatten())}, min {min(seg.flatten())}")
+    if(sum(predecessor_clone.flatten()) == -1 * len(predecessor_clone.flatten())):
+        # print('fuck0')
+        return 0
+    if(sum(seg.flatten()) / (seg.shape[0] * seg.shape[1] * seg.shape[2]) > 0.05):
+        # print("fuck0")
+        return 0
+    bin_pred = seg
     # bin_pred = binary_erosion(bin_pred, iterations=3)
     soma_cc = soma_cc_cc3d(bin_pred, soma_clone)
     soma_cc = binary_dilation(soma_cc, iterations=3)
@@ -99,27 +141,15 @@ def npathloss(gt, pred, predecessor, num_paths=10, soma=None, debug=False, thres
 
     rand_points = random_foreground_points(non_soma_cc, num_paths)
     pt_loss = 0
-    if(debug):
+
+    if (debug):
         paths = []
     for start_point in rand_points:
-        # print(f"point: {point}, {point[0]}")
-        # print(f"type of point: {type(point)}, {type(point[0])}")
-        path = find_path_to_source(predecessor_clone, start_point, soma_clone)
+        mask_path, mask_path_from_soma = calculate_path_loss_mask(predecessor_clone, bin_pred, start_point, soma_clone, threshold)
         if(debug):
+            # path = find_foreground_points(mask_path)
+            path = find_path_to_source(predecessor_clone, start_point, soma_clone)
             paths.append(path)
-        # 反转path， 即从soma开始
-        path = path[::-1]
-        # print(f'start_point: {start_point}, path[0]: {path[0]}, path[-1]: {path[-1]}, {bin_pred[path[0]]}, {bin_pred[path[-1]]}')
-        mask_path = np.zeros_like(gt_clone)
-        mask_path_from_soma = np.zeros_like(gt_clone)
-        continue_from_soma_flag = True
-        for point in path:
-            mask_path[point] = 1
-            if(bin_pred[point] < threshold): # 第一个中断点
-                continue_from_soma_flag = False
-            if(not continue_from_soma_flag):
-                mask_path_from_soma[point] = 1
-        # to tensor, and change to device
         mask_path = torch.from_numpy(mask_path).to(pred.device)
         mask_path_from_soma = torch.from_numpy(mask_path_from_soma).to(pred.device)
 
@@ -129,13 +159,37 @@ def npathloss(gt, pred, predecessor, num_paths=10, soma=None, debug=False, thres
 
         # print(f"torch.sum(ptls1) * torch.sum(ptls2) {torch.sum(ptls1)} {torch.sum(ptls2)}")
 
-        pt_loss = pt_loss + (torch.sum(ptls1) + smooth) * (torch.sum(ptls2) + smooth)
+        pt_loss = pt_loss + (torch.sum(ptls1) + smooth) * (torch.sum(ptls2) + smooth) / (mask_path.sum() ** 2 * 0.5)
 
 
-    if(debug):
-        temp_file_path = "/home/kfchen/temp_mip/" + str(time.time()) + ".png"
-        mip_and_path_visualization(pred_clone, paths, temp_file_path, num_paths)
+    if (debug):
+        dir_path = "/home/kfchen/temp_mip/"
+        file_numbers = len([lists for lists in os.listdir(dir_path) if os.path.isfile(os.path.join(dir_path, lists))])
+        if (file_numbers > 60):
+            pass
+            os.remove(dir_path + os.listdir(dir_path)[-1])
+        else:
+            temp_file_path = "/home/kfchen/temp_mip/" + str(time.time()) + "_" + str(pt_loss)
+            if(len(rand_points) == 0):
+                temp_num_paths = 0
+            else:
+                temp_num_paths = 10
+            mip_and_path_visualization(seg.astype(np.uint8), paths, temp_file_path+"seg.png", temp_num_paths)
+            # mip_and_path_visualization(soma_cc, paths, temp_file_path+"soma_cc.png", temp_num_paths)
+            # mip_and_path_visualization(non_soma_cc, paths, temp_file_path+"non_soma_cc.png", temp_num_paths)
+            mip_and_path_visualization(gt_clone, paths, temp_file_path+"gt.png", temp_num_paths)
+            # print(gt_clone.shape)
+            # print(gt_clone.dtype)
+            # print(max(gt_clone.flatten()), min(gt_clone.flatten()))
+            # gt_clone = np.where(gt_clone > 0.5, 1, 0).astype(np.uint8) * 255
+            # print(gt_clone.shape)
+            # print(gt_clone.dtype)
+            # print(max(gt_clone.flatten()), min(gt_clone.flatten()))
+            # tifffile.imwrite(temp_file_path+"gt.tif", gt_clone)
+            # tifffile.imwrite(temp_file_path+"seg.tif", seg.cpu().numpy().astype(np.uint8) * 255)
 
 
+
+
+    # print(f"pt_loss {pt_loss}, rand_points {len(rand_points)}")
     return pt_loss
-
