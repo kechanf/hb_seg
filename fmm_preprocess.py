@@ -126,18 +126,45 @@ def opening_get_soma_region_gpu(soma_region):
     return soma_region
 
 import skimage
-def compute_centroid(mask):
-    # 计算三维 mask 的重心
-    labeled_mask = skimage.measure.label(mask)
-    # props = regionprops(labeled_mask)
-    props = skimage.measure.regionprops(labeled_mask)
+# def compute_centroid(mask):
+#     # 计算三维 mask 的重心
+#     labeled_mask = skimage.measure.label(mask)
+#     # props = regionprops(labeled_mask)
+#     props = skimage.measure.regionprops(labeled_mask)
+#
+#     if len(props) > 0:
+#         # 获取第一个区域的重心坐标
+#         centroid = props[0].centroid
+#         return centroid
+#     else:
+#         return None
 
-    if len(props) > 0:
-        # 获取第一个区域的重心坐标
-        centroid = props[0].centroid
-        return centroid
-    else:
+def compute_centroid(mask):
+    # 使用 cc3d 对3D mask进行连通区域标记
+    labels = cc3d.connected_components(mask)  # 默认情况下, cc3d 会返回一个与 mask 同形状的标记数组
+
+    # 初始化最大连通块的体积为0和其标签
+    max_volume = 0
+    max_label = 0
+
+    # 找出最大的连通块
+    for label in np.unique(labels):
+        if label == 0:  # 跳过背景
+            continue
+        volume = (labels == label).sum()
+        if volume > max_volume:
+            max_volume = volume
+            max_label = label
+
+    # 如果没有找到连通块，则返回None
+    if max_label == 0:
         return None
+
+    # 计算最大连通块的重心
+    coords = np.argwhere(labels == max_label)
+    centroid = coords.mean(axis=0)
+
+    return tuple(centroid)
 
 def get_soma(img, img_path, temp_path=r"/home/kfchen/temp_tif", v3d_path=r"/home/kfchen/Vaa3D-x.1.1.4_Ubuntu/Vaa3D-x"):
     # temp_path=r"C:\Users\12626\Desktop\topo_test\temp_path
@@ -194,6 +221,42 @@ def get_soma(img, img_path, temp_path=r"/home/kfchen/temp_tif", v3d_path=r"/home
     soma_region = restore_original_size(soma_region, original_shape, min_coords)
 
     return compute_centroid(soma_region)
+
+def simple_get_soma(img, img_path, temp_path=r"/home/kfchen/temp_tif", v3d_path=r"/home/kfchen/Vaa3D-x.1.1.4_Ubuntu/Vaa3D-x"):
+    file_name = os.path.basename(img_path)
+    # print(file_name)
+    in_tmp = os.path.join(temp_path, file_name + 'temp.tif')
+    tifffile.imwrite(in_tmp, (img * 255).astype(np.uint8))
+    out_tmp = in_tmp.replace('.tif', '_gsdt.tif')
+
+    if (sys.platform == "linux"):
+        cmd_str = f'xvfb-run -a -s "-screen 0 640x480x16" {v3d_path} -x gsdt -f gsdt -i {in_tmp} -o {out_tmp} -p 0 1 0 1.5'
+        cmd_str = process_path(cmd_str)
+        # print(cmd_str)
+        subprocess.run(cmd_str, stdout=subprocess.DEVNULL, shell=True)
+    else:
+        cmd = f'{v3d_path} /x gsdt /f gsdt /i {in_tmp} /o {out_tmp} /p 0 1 0 1.5'
+        # print(cmd)
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+
+    if(not os.path.exists(out_tmp)):
+        return None
+    gsdt = tifffile.imread(out_tmp).astype(np.uint8)
+    gsdt = np.flip(gsdt, axis=1)
+
+    max_gsdt = np.max(gsdt)
+    gsdt[gsdt <= max_gsdt * 0.95] = 0
+    gsdt[gsdt > max_gsdt * 0.95] = 1
+
+    centroid = compute_centroid(gsdt)
+
+    if (os.path.exists(out_tmp)): os.remove(out_tmp)
+    if (os.path.exists(in_tmp)): os.remove(in_tmp)
+    del out_tmp, in_tmp
+
+    return centroid
+
+
 
 
 def compute_fmm_single_source(binary_image, source_point):
@@ -330,10 +393,11 @@ def naive_trace_path(fmm_distance_field, source_point, foreground_mask, neighbor
     return paths
 
 
-def mip_and_path_visualization(image, paths, source_point, num_paths=5):
+def mip_and_path_visualization(image, paths, source_point, temp_mip_path, num_paths=5):
     """
     在XY平面上计算三维图像的MIP，并在MIP上绘制从源点到目标点的路径。
     """
+
     # 计算XY平面的MIP
     mip_xy = np.max(image, axis=0)
 
@@ -359,7 +423,7 @@ def mip_and_path_visualization(image, paths, source_point, num_paths=5):
     plt.ylabel('Y-axis')
     plt.title('MIP on XY Plane with Path')
     # plt.show()
-    plt.savefig('path.png')
+    plt.savefig(temp_mip_path)
 
 def save_fmm_distance_field(img, fmm_distance_field, file_path):
     fmm_distance_field = np.where(img, fmm_distance_field.max()-fmm_distance_field, 0)
@@ -431,19 +495,22 @@ def get_fmm_path(tif_path, fmm_folder=r'C:\Users\12626\Desktop\topo_test', path_
     paths = naive_trace_path(fmm_distance_field, source_point, img)
     save_paths(paths, path_path)
 
-def visualize_fmm_path(tif_path, fmm_folder=r'C:\Users\12626\Desktop\topo_test', path_folder=r'C:\Users\12626\Desktop\topo_test', num_paths=5):
+def visualize_fmm_path(tif_path, fmm=None, fmm_folder=r'C:\Users\12626\Desktop\topo_test', paths=None, path_folder=r'C:\Users\12626\Desktop\topo_test',temp_mip_folder=r"", num_paths=5):
     # visualization
-    paths = load_paths(os.path.join(path_folder, os.path.basename(tif_path).split('.')[0]+'.pkl'))
-    fmm_distance_field = tifffile.imread(os.path.join(fmm_folder, os.path.basename(tif_path).split('.')[0]+'.tif'))
+    if(paths==None):
+        paths = load_paths(os.path.join(path_folder, os.path.basename(tif_path).split('.')[0]+'.pkl'))
+    temp_mip_path = os.path.join(temp_mip_folder, os.path.basename(tif_path).split('.')[0]+'.png')
+    if(fmm==None):
+        fmm_distance_field = tifffile.imread(os.path.join(fmm_folder, os.path.basename(tif_path).split('.')[0]+'.tif'))
     # find source point have only one path
     source_points = [point for point, path in paths.items() if len(path) == 1]
-    mip_and_path_visualization(fmm_distance_field, paths, source_points[0], num_paths)
+    mip_and_path_visualization(fmm_distance_field, paths, source_points[0], temp_mip_path, num_paths)
 
-def save_swc(tif_path, num_paths=5):
+def save_swc(tif_path, temp_swc_folder, num_paths=5):
     paths = load_paths(os.path.join(path_folder, os.path.basename(tif_path).split('.')[0] + '.pkl'))
     selected_keys = random.sample(list(paths.keys()), min(num_paths, len(paths)))
     p_num = 0
-    swc_path = os.path.join(path_folder, os.path.basename(tif_path).split('.')[0] + '.swc')
+    swc_path = os.path.join(temp_swc_folder, os.path.basename(tif_path).split('.')[0] + '.swc')
     swc_str = ''
     soma_flag = False
 
@@ -465,8 +532,10 @@ if __name__ == '__main__':
     tif_folder = r'/data/kfchen/nnUNet/nnUNet_raw/Dataset159_human_brain_10000_tpls/labelsTr'
     fmm_folder = r'/data/kfchen/nnUNet/nnUNet_raw/Dataset159_human_brain_10000_tpls/fmm'
     path_folder = r'/data/kfchen/nnUNet/nnUNet_raw/Dataset159_human_brain_10000_tpls/path'
+    temp_swc_folder = r'/data/kfchen/nnUNet/nnUNet_raw/Dataset159_human_brain_10000_tpls/temp_swc'
+    temp_mip_folder = r"/data/kfchen/nnUNet/nnUNet_raw/Dataset159_human_brain_10000_tpls/temp_mip"
     temp_path = r"/home/kfchen/temp_tif"
-    for folder in [fmm_folder, path_folder]:
+    for folder in [fmm_folder, path_folder, temp_swc_folder, temp_mip_folder]:
         if(os.path.exists(folder) == False):
             os.makedirs(folder)
     for file in os.listdir(temp_path):
@@ -477,20 +546,27 @@ if __name__ == '__main__':
     debug = False
     if(debug):
         # delete all files in fmm_folder and path_folder
-        for file in os.listdir(fmm_folder):
-            os.remove(os.path.join(fmm_folder, file))
-        for file in os.listdir(path_folder):
-            os.remove(os.path.join(path_folder, file))
+        # for file in os.listdir(fmm_folder):
+        #     os.remove(os.path.join(fmm_folder, file))
+        # for file in os.listdir(path_folder):
+        #     os.remove(os.path.join(path_folder, file))
         tif_list = tif_list[:5]
 
-    partial_func = partial(get_fmm_path, fmm_folder=fmm_folder, path_folder=path_folder, temp_path=temp_path)
-    with Pool(5) as p:
-        for _ in tqdm(p.imap_unordered(partial_func, tif_list), total=len(tif_list)):
-            pass
+    # partial_func = partial(get_fmm_path, fmm_folder=fmm_folder, path_folder=path_folder, temp_path=temp_path)
+    # with Pool(5) as p:
+    #     for _ in tqdm(p.imap_unordered(partial_func, tif_list), total=len(tif_list)):
+    #         pass
+    # for tif_path in tif_list:
+    #     tif = tifffile.imread(tif_path)
+    #     connected_components = cc3d.connected_components(tif, connectivity=26)
+    #     num_components = np.max(connected_components)
+    #     if(num_components > 1):
+    #         print(f"num_components {num_components} in {tif_path}")
 
     if(debug):
-        visualize_fmm_path(tif_list[0], fmm_folder=fmm_folder, path_folder=path_folder, num_paths=10)
-        save_swc(tif_list[0], num_paths=10)
+        for tif_path in tif_list:
+            visualize_fmm_path(tif_path, fmm_folder=fmm_folder, path_folder=path_folder, temp_mip_folder=temp_mip_folder, num_paths=10)
+            save_swc(tif_path, temp_swc_folder, num_paths=10)
 
 
 
