@@ -122,12 +122,6 @@ def process_files(gt_file, pred_file, v3d_path):
 
 def l_measure_gt_and_pred(gt_dir, pred_dir, gt_csv, pred_csv, violin_png,
                           v3d_path=r"/home/kfchen/Vaa3D-x.1.1.4_Ubuntu/Vaa3D-x", debug=False):
-    if (os.path.exists(pred_csv) and os.path.exists((gt_csv))):
-        df_gt = pd.read_csv(gt_csv)
-        df_pred = pd.read_csv(pred_csv)
-        plot_violin(df_gt, df_pred, violin_png)
-        return
-
     features_all = pd.DataFrame(columns=['ID', 'N_node', 'Soma_surface', 'N_stem', 'Number of Bifurcatons',
                                          'Number of Branches', 'Number of Tips', 'Overall Width', 'Overall Height',
                                          'Overall Depth', 'Average Diameter', 'Total Length', 'Total Surface',
