@@ -79,13 +79,13 @@ def plot_violin(df_gt, df_pred, violin_png):
     # plt.figure(figsize=(20, 20))
 
     num_features = len(feature_name)
-    cols = 3  # 每行显示3个子图
+    cols = 5  # 每行显示3个子图
     rows = (num_features + cols - 1) // cols
     fig, axes = plt.subplots(rows, cols, figsize=(5 * cols, 5 * rows), sharey=False)
     axes = axes.flatten()
 
-    df_gt['Type'] = 'GT'  # "ce+dice"
-    df_pred['Type'] = 'Pred'  # "ce+dice+ptls"
+    df_gt['Type'] = 'ce+dice'  # "GT"
+    df_pred['Type'] = 'ce+dice+ptls'  # "Pred"
 
     df = pd.concat([df_gt, df_pred], axis=0)
     df_long = pd.melt(df, id_vars=['Type'], value_vars=feature_name, var_name='Feature', value_name='Value')
@@ -184,8 +184,8 @@ def l_measure_gt_and_pred(gt_dir, pred_dir, gt_csv, pred_csv, violin_png,
 if __name__ == '__main__':
     # gt_dir = r"/data/kfchen/nnUNet/gt_swc"
     # pred_dir = r"/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/10847_auto_v1.4_12k/swc"
-    gt_dir = r"/data/kfchen/nnUNet/gt_swc"
-    pred_dir = r"/data/kfchen/nnUNet/nnUNet_raw/result500_fb/v3dswc"
+    gt_dir = r"/data/kfchen/trace_ws/result500_fb_finetune_e400/v3dswc"
+    pred_dir = r"/data/kfchen/trace_ws/result500_161_v13_e150/v3dswc"
 
     gt_csv = r"/data/kfchen/nnUNet/gt_swc.csv"
     pred_csv = r"/data/kfchen/nnUNet/pred_swc.csv"

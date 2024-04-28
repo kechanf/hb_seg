@@ -5,7 +5,7 @@ import numpy as np
 
 import queue
 import seaborn as sns
-from simple_swc_tool import *
+from simple_swc_tool.swc_base import *
 
 def read_swc(swc_name):
     point_l = swcP_list()

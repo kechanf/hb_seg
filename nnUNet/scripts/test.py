@@ -64,7 +64,7 @@ elif (sys.platform == "linux"):
 # pred_path = r"D:\tracing_ws\nnUNet\nnUNet_results\150_test1223"
 # pred_path = r"E:\tracing_ws\10847\TEST10K7"
 data_source_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/Dataset102_human_brain_test500"
-result_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/result500_fb_finetune_e400"
+result_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/result500_161_v13_e150"
 
 trace_ws_path = r"/data/kfchen/trace_ws"
 # make dir for new result folder
