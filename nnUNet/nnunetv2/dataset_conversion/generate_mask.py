@@ -371,6 +371,10 @@ def gen_seg_mask(origin_swc_path, img_path, target_img_dir, target_swc_dir, targ
         return
 
     img = tifffile.imread(img_path)
+
+    # 补齐
+    
+
     scale_factors = [n / o for n, o in zip(patch_size, img.shape)]
     if (not os.path.exists(target_img_path)):
         img = scipy.ndimage.zoom(img, scale_factors, order=3)

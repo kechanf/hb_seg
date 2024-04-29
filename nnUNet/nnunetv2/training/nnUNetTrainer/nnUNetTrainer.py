@@ -64,6 +64,9 @@ from torch import distributed as dist
 from torch.cuda import device_count
 from torch.cuda.amp import GradScaler
 from torch.nn.parallel import DistributedDataParallel as DDP
+from nnunetv2.preprocessing.predecessor_trans import AddPredecessorImageTransform
+from nnunetv2.preprocessing.test_trans import TestTransform
+from matplotlib import pyplot as plt
 
 
 class nnUNetTrainer(object):
@@ -144,11 +147,11 @@ class nnUNetTrainer(object):
         self.initial_lr = 1e-2
         self.weight_decay = 3e-5
         self.oversample_foreground_percent = 0.33
-        self.num_iterations_per_epoch = 250
-        self.num_val_iterations_per_epoch = 50
+        self.num_iterations_per_epoch = 10
+        self.num_val_iterations_per_epoch = 10
         self.num_epochs = 1000
         self.current_epoch = 0
-        self.enable_deep_supervision = True
+        self.enable_deep_supervision = False
 
         ### Dealing with labels/regions
         self.label_manager = self.plans_manager.get_label_manager(dataset_json)
@@ -376,21 +379,6 @@ class nnUNetTrainer(object):
         # we give each output a weight which decreases exponentially (division by 2) as the resolution decreases
         # this gives higher resolution outputs more weight in the loss
 
-        if self.enable_deep_supervision:
-            deep_supervision_scales = self._get_deep_supervision_scales()
-            weights = np.array([1 / (2 ** i) for i in range(len(deep_supervision_scales))])
-            if self.is_ddp and not self._do_i_compile():
-                # very strange and stupid interaction. DDP crashes and complains about unused parameters due to
-                # weights[-1] = 0. Interestingly this crash doesn't happen with torch.compile enabled. Strange stuff.
-                # Anywho, the simple fix is to set a very low weight to this.
-                weights[-1] = 1e-6
-            else:
-                weights[-1] = 0
-
-            # we don't use the lowest 2 outputs. Normalize weights so that they sum to 1
-            weights = weights / weights.sum()
-            # now wrap the loss
-            loss = DeepSupervisionWrapper(loss, weights)
         return loss
 
     def configure_rotation_dummyDA_mirroring_and_inital_patch_size(self):
@@ -702,6 +690,7 @@ class nnUNetTrainer(object):
             foreground_labels: Union[Tuple[int, ...], List[int]] = None,
             regions: List[Union[List[int], Tuple[int, ...], int]] = None,
             ignore_label: int = None,
+            get_predecessor_from_target: bool = True
     ) -> AbstractTransform:
         tr_transforms = []
         if do_dummy_2d_data_aug:
@@ -712,33 +701,10 @@ class nnUNetTrainer(object):
             patch_size_spatial = patch_size
             ignore_axes = None
 
-        tr_transforms.append(SpatialTransform(
-            patch_size_spatial, patch_center_dist_from_border=None,
-            do_elastic_deform=False, alpha=(0, 0), sigma=(0, 0),
-            do_rotation=True, angle_x=rotation_for_DA['x'], angle_y=rotation_for_DA['y'], angle_z=rotation_for_DA['z'],
-            p_rot_per_axis=1,  # todo experiment with this
-            do_scale=True, scale=(0.7, 1.4),
-            border_mode_data="constant", border_cval_data=0, order_data=order_resampling_data,
-            border_mode_seg="constant", border_cval_seg=border_val_seg, order_seg=order_resampling_seg,
-            random_crop=False,  # random cropping is part of our dataloaders
-            p_el_per_sample=0, p_scale_per_sample=0.2, p_rot_per_sample=0.2,
-            independent_scale_for_each_axis=False  # todo experiment with this
-        ))
+        tr_transforms.append(TestTransform(patch_size))
 
         if do_dummy_2d_data_aug:
             tr_transforms.append(Convert2DTo3DTransform())
-
-        tr_transforms.append(GaussianNoiseTransform(p_per_sample=0.1))
-        tr_transforms.append(GaussianBlurTransform((0.5, 1.), different_sigma_per_channel=True, p_per_sample=0.2,
-                                                   p_per_channel=0.5))
-        tr_transforms.append(BrightnessMultiplicativeTransform(multiplier_range=(0.75, 1.25), p_per_sample=0.15))
-        tr_transforms.append(ContrastAugmentationTransform(p_per_sample=0.15))
-        tr_transforms.append(SimulateLowResolutionTransform(zoom_range=(0.5, 1), per_channel=True,
-                                                            p_per_channel=0.5,
-                                                            order_downsample=0, order_upsample=3, p_per_sample=0.25,
-                                                            ignore_axes=ignore_axes))
-        tr_transforms.append(GammaTransform((0.7, 1.5), True, True, retain_stats=True, p_per_sample=0.1))
-        tr_transforms.append(GammaTransform((0.7, 1.5), False, True, retain_stats=True, p_per_sample=0.3))
 
         if mirror_axes is not None and len(mirror_axes) > 0:
             tr_transforms.append(MirrorTransform(mirror_axes))
@@ -749,34 +715,13 @@ class nnUNetTrainer(object):
 
         tr_transforms.append(RemoveLabelTransform(-1, 0))
 
-        if is_cascaded:
-            assert foreground_labels is not None, 'We need foreground_labels for cascade augmentations'
-            tr_transforms.append(MoveSegAsOneHotToData(1, foreground_labels, 'seg', 'data'))
-            tr_transforms.append(ApplyRandomBinaryOperatorTransform(
-                channel_idx=list(range(-len(foreground_labels), 0)),
-                p_per_sample=0.4,
-                key="data",
-                strel_size=(1, 8),
-                p_per_label=1))
-            tr_transforms.append(
-                RemoveRandomConnectedComponentFromOneHotEncodingTransform(
-                    channel_idx=list(range(-len(foreground_labels), 0)),
-                    key="data",
-                    p_per_sample=0.2,
-                    fill_with_other_class_p=0,
-                    dont_do_if_covers_more_than_x_percent=0.15))
-
         tr_transforms.append(RenameTransform('seg', 'target', True))
 
-        if regions is not None:
-            # the ignore label must also be converted
-            tr_transforms.append(ConvertSegmentationToRegionsTransform(list(regions) + [ignore_label]
-                                                                       if ignore_label is not None else regions,
-                                                                       'target', 'target'))
+        if(get_predecessor_from_target):
+            tr_transforms.append(AddPredecessorImageTransform('predecessor', 'target', 'soma'))
+            tr_transforms.append(NumpyToTensor(['predecessor'], 'float'))
+            tr_transforms.append(NumpyToTensor(['soma'], 'float'))
 
-        if deep_supervision_scales is not None:
-            tr_transforms.append(DownsampleSegForDSTransform2(deep_supervision_scales, 0, input_key='target',
-                                                              output_key='target'))
         tr_transforms.append(NumpyToTensor(['data', 'target'], 'float'))
         tr_transforms = Compose(tr_transforms)
         return tr_transforms
@@ -788,24 +733,18 @@ class nnUNetTrainer(object):
             foreground_labels: Union[Tuple[int, ...], List[int]] = None,
             regions: List[Union[List[int], Tuple[int, ...], int]] = None,
             ignore_label: int = None,
+            get_predecessor_from_target: bool = True
     ) -> AbstractTransform:
         val_transforms = []
         val_transforms.append(RemoveLabelTransform(-1, 0))
 
-        if is_cascaded:
-            val_transforms.append(MoveSegAsOneHotToData(1, foreground_labels, 'seg', 'data'))
-
         val_transforms.append(RenameTransform('seg', 'target', True))
 
-        if regions is not None:
-            # the ignore label must also be converted
-            val_transforms.append(ConvertSegmentationToRegionsTransform(list(regions) + [ignore_label]
-                                                                        if ignore_label is not None else regions,
-                                                                        'target', 'target'))
+        if(get_predecessor_from_target):
+            val_transforms.append(AddPredecessorImageTransform('predecessor', 'target', 'soma'))
+            val_transforms.append(NumpyToTensor(['predecessor'], 'float'))
+            val_transforms.append(NumpyToTensor(['soma'], 'float'))
 
-        if deep_supervision_scales is not None:
-            val_transforms.append(DownsampleSegForDSTransform2(deep_supervision_scales, 0, input_key='target',
-                                                               output_key='target'))
 
         val_transforms.append(NumpyToTensor(['data', 'target'], 'float'))
         val_transforms = Compose(val_transforms)
@@ -903,15 +842,74 @@ class nnUNetTrainer(object):
         # lrs are the same for all workers so we don't need to gather them in case of DDP training
         self.logger.log('lrs', self.optimizer.param_groups[0]['lr'], self.current_epoch)
 
-    def train_step(self, batch: dict) -> dict:
+    def save_mip(self, epoch, batch_id, tag, data, target, output):
+        # print(f"tag: {tag}, data.shape: {data[0].shape}, target.shape: {target[0].shape}, output.shape: {output[0].shape}")
+        #tag: train, data.shape: torch.Size([1, 48, 224, 224]), target.shape: torch.Size(
+        # [2, 1, 48, 224, 224]), output.shape: torch.Size([2, 48, 224, 224])
+        # print(len(target)) # 5
+        x_clone = output.detach().cpu().numpy()
+        y_clone = target[0][0].detach().cpu().numpy()
+        data_clone = data[0][0].detach().cpu().numpy()
+        seg = np.zeros((x_clone.shape[0], 1, x_clone.shape[2], x_clone.shape[3], x_clone.shape[4]))
+        for batch in range(x_clone.shape[0]):
+            seg0 = x_clone[batch].argmax(axis=0)
+            seg[batch] = seg0[np.newaxis, :]
+        seg = seg[0][0]
+        data_clone = np.asarray(data_clone)
+        y_clone = np.asarray(y_clone)
+        seg = np.asarray(seg)
+        # print(f"seg.shape: {seg.shape}, y_clone.shape: {y_clone.shape}, data_clone.shape: {data_clone.shape}")
+        # mips
+        seg = np.max(seg, axis=0)
+        y_clone = np.max(y_clone, axis=0)
+        data_clone = np.max(data_clone, axis=0)
+
+        # 归一化到0-255并转换为uint8
+        seg_normalized = ((seg - seg.min()) / (seg.max() - seg.min()) * 255).astype(np.uint8)
+        y_clone_normalized = ((y_clone - y_clone.min()) / (y_clone.max() - y_clone.min()) * 255).astype(np.uint8)
+        data_clone_normalized = ((data_clone - data_clone.min()) / (data_clone.max() - data_clone.min()) * 255).astype(
+            np.uint8)
+
+        # 创建一个图和子图
+        fig, axes = plt.subplots(1, 3, figsize=(18, 6))  # 调整整体大小和子图数量
+        fig.subplots_adjust(hspace=0.3, wspace=0.3)  # 调整子图间的间隔
+
+        # 显示第一张图
+        ax = axes[0]
+        ax.imshow(seg_normalized, cmap='gray')
+        ax.axis('off')  # 关闭坐标轴
+        ax.set_title('Segmentation')
+
+        # 显示第二张图
+        ax = axes[1]
+        ax.imshow(y_clone_normalized, cmap='gray')
+        ax.axis('off')
+        ax.set_title('Y Clone')
+
+        # 显示第三张图
+        ax = axes[2]
+        ax.imshow(data_clone_normalized, cmap='gray')
+        ax.axis('off')
+        ax.set_title('Data Clone')
+
+        # 保存整张图
+        png_path = f"/data/kfchen/nnUNet/temp_mip/{tag}/epoch_{epoch}_batch_{batch_id}.png"
+        plt.savefig(png_path)
+        plt.close(fig)  # 关闭图像，避免在内存中占用过多资源
+
+    def train_step(self, epoch, batch_id, batch: dict) -> dict:
         data = batch['data']
         target = batch['target']
+        predecessor = batch['predecessor']
+        soma = batch['soma']
 
         data = data.to(self.device, non_blocking=True)
         if isinstance(target, list):
             target = [i.to(self.device, non_blocking=True) for i in target]
         else:
             target = target.to(self.device, non_blocking=True)
+        predecessor = predecessor.to(self.device, non_blocking=True)
+        soma = soma.to(self.device, non_blocking=True)
 
         self.optimizer.zero_grad(set_to_none=True)
         # Autocast can be annoying
@@ -920,8 +918,10 @@ class nnUNetTrainer(object):
         # So autocast will only be active if we have a cuda device.
         with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
             output = self.network(data)
+            self.save_mip(epoch, batch_id, "train", data, target, output)
             # del data
-            l = self.loss(output, target)
+            l = self.loss(output, target, predecessor, soma)
+            print(f"l: {l}")
 
         if self.grad_scaler is not None:
             self.grad_scaler.scale(l).backward()
@@ -1292,7 +1292,7 @@ class nnUNetTrainer(object):
             self.on_train_epoch_start()
             train_outputs = []
             for batch_id in range(self.num_iterations_per_epoch):
-                train_outputs.append(self.train_step(next(self.dataloader_train)))
+                train_outputs.append(self.train_step(epoch, batch_id, next(self.dataloader_train)))
             self.on_train_epoch_end(train_outputs)
 
             with torch.no_grad():

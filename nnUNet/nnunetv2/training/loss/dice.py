@@ -3,6 +3,8 @@ from typing import Callable
 import torch
 from nnunetv2.utilities.ddp_allgather import AllGatherGrad
 from torch import nn
+import numpy as np
+from nnunetv2.training.loss.npathloss import npathloss
 
 
 class SoftDiceLoss(nn.Module):
@@ -69,13 +71,7 @@ class MemoryEfficientSoftDiceLoss(nn.Module):
         self.smooth = smooth
         self.ddp = ddp
 
-    def forward(self, x, y, loss_mask=None):
-        if self.apply_nonlin is not None:
-            x = self.apply_nonlin(x)
-
-        # make everything shape (b, c)
-        axes = tuple(range(2, x.ndim))
-
+    def calc_diceloss(self, x, y, axes, loss_mask=None):
         with torch.no_grad():
             if x.ndim != y.ndim:
                 y = y.view((y.shape[0], 1, *y.shape[1:]))
@@ -114,8 +110,39 @@ class MemoryEfficientSoftDiceLoss(nn.Module):
             sum_gt = sum_gt.sum(0)
 
         dc = (2 * intersect + self.smooth) / (torch.clip(sum_gt + sum_pred + self.smooth, 1e-8))
-
         dc = dc.mean()
+        return dc
+
+    def calc_npathloss(self, x, y, predecessor, axes, num_paths=10, soma=None):  # x0=pred, y0=gt
+
+        # get segment
+        x_clone = x.detach().cpu().numpy()
+        seg = np.zeros((x_clone.shape[0], 1, x_clone.shape[2], x_clone.shape[3], x_clone.shape[4]))
+        for batch in range(x_clone.shape[0]):
+            seg0 = x_clone[batch].argmax(axis=0)
+            seg[batch] = seg0[np.newaxis, :]
+        # x.shape, y.shape: torch.Size([2, 2, 48, 224, 224]), torch.Size([2, 1, 48, 224, 224]), seg.shape: (2, 1, 48, 224, 224)
+
+        pathloss = get_pathloss(x[:, 1:], y, seg, predecessor, axes, num_paths, soma)
+        pathloss = pathloss.mean()
+        return pathloss
+
+    def forward(self, x, y, loss_mask=None, predecessor=None, soma=None, ptls_switch=True):
+        print(len(x), len(y))
+        print(f"x.shape, y.shape: {x[0].shape}, {y[0].shape}")
+        if self.apply_nonlin is not None:
+            x = self.apply_nonlin(x)
+
+        # make everything shape (b, c)
+        axes = tuple(range(2, x.ndim))
+
+        dc = self.calc_diceloss(x, y, axes, loss_mask)
+        print("fuck")
+        if(ptls_switch):
+            ptls = self.calc_npathloss(x, y, predecessor, axes, num_paths=50, soma=soma)
+            print(ptls)
+            return -dc + ptls
+
         return -dc
 
 
@@ -179,6 +206,33 @@ def get_tp_fp_fn_tn(net_output, gt, axes=None, mask=None, square=False):
 
     return tp, fp, fn, tn
 
+def get_pathloss(net_output, gt, seg, predecessor, axes=None, num_paths=10, soma=None): # x0=pred, y0=gt
+
+    if axes is None:
+        axes = tuple(range(2, len(net_output.size())))
+
+    with torch.no_grad():
+        shp_x = net_output.shape
+        shp_y = gt.shape
+
+        if len(shp_x) != len(shp_y):
+            gt = gt.view((shp_y[0], 1, *shp_y[1:]))
+            shp_x = net_output.shape
+            shp_y = gt.shape
+
+    ptls = torch.zeros((shp_x[0], shp_x[1]), device=net_output.device)
+    for batch in range(shp_x[0]):
+        # print(f"len: {len(net_output)}, {len(gt)}, {len(seg)}, {len(predecessor)}, {len(soma)}")
+        # print(f"gtshape: {gt.shape}, net_outputshape: {net_output.shape}, segshape: {seg.shape}, predecessorshape: {predecessor.shape}, somashape: {soma.shape}")
+        # print(f"gtpathloss: {gt[batch, 0, ...].shape}, net_output: {net_output[batch, 0, ...].shape}, seg: {seg[batch, 0, ...].shape}, predecessor: {predecessor[batch, 0, ...].shape}, soma: {soma[batch, 0, ...].shape}"
+        # print(current_soma)
+        # print(ptls.shape, batch)
+        x = npathloss(gt[batch, 0, ...], net_output[batch, 0, ...],
+                                seg[batch, 0, ...], predecessor[batch, 0, ...],
+                                num_paths, soma[batch, 0, ...])
+        ptls[batch] = x
+
+    return ptls
 
 if __name__ == '__main__':
     from nnunetv2.utilities.helpers import softmax_helper_dim1
