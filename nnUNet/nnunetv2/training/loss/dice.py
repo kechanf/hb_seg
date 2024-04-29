@@ -141,9 +141,9 @@ class MemoryEfficientSoftDiceLoss(nn.Module):
         if(ptls_switch):
             ptls = self.calc_npathloss(x, y, predecessor, axes, num_paths=50, soma=soma)
             print(ptls)
-            return -dc + ptls
+            return -dc + ptls, {"dc": -dc, "ptls": ptls}
 
-        return -dc
+        return -dc, {"dc": -dc}
 
 
 def get_tp_fp_fn_tn(net_output, gt, axes=None, mask=None, square=False):

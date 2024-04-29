@@ -23,7 +23,9 @@ class nnUNetLogger(object):
             'val_losses': list(),
             'lrs': list(),
             'epoch_start_timestamps': list(),
-            'epoch_end_timestamps': list()
+            'epoch_end_timestamps': list(),
+            'train_ptls': list(),
+            'val_ptls': list()
         }
         self.verbose = verbose
         # shut up, this logging is great
@@ -55,7 +57,7 @@ class nnUNetLogger(object):
         # we infer the epoch form our internal logging
         epoch = min([len(i) for i in self.my_fantastic_logging.values()]) - 1  # lists of epoch 0 have len 1
         sns.set(font_scale=2.5)
-        fig, ax_all = plt.subplots(3, 1, figsize=(30, 54))
+        fig, ax_all = plt.subplots(4, 1, figsize=(30, 54))
         # regular progress.png as we are used to from previous nnU-Net versions
         ax = ax_all[0]
         ax2 = ax.twinx()
@@ -89,6 +91,14 @@ class nnUNetLogger(object):
         ax.plot(x_values, self.my_fantastic_logging['lrs'][:epoch + 1], color='b', ls='-', label="learning rate", linewidth=4)
         ax.set_xlabel("epoch")
         ax.set_ylabel("learning rate")
+        ax.legend(loc=(0, 1))
+
+        # ptls
+        ax = ax_all[3]
+        ax.plot(x_values, self.my_fantastic_logging['train_ptls'][:epoch + 1], color='b', ls='-', label="train_ptl", linewidth=4)
+        ax.plot(x_values, self.my_fantastic_logging['val_ptls'][:epoch + 1], color='r', ls='-', label="val_ptl", linewidth=4)
+        ax.set_xlabel("epoch")
+        ax.set_ylabel("ptl")
         ax.legend(loc=(0, 1))
 
         plt.tight_layout()

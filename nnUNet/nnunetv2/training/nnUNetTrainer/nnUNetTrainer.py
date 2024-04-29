@@ -920,8 +920,7 @@ class nnUNetTrainer(object):
             output = self.network(data)
             self.save_mip(epoch, batch_id, "train", data, target, output)
             # del data
-            l = self.loss(output, target, predecessor, soma)
-            print(f"l: {l}")
+            l, loss_dict = self.loss(output, target, predecessor, soma)
 
         if self.grad_scaler is not None:
             self.grad_scaler.scale(l).backward()
@@ -933,7 +932,11 @@ class nnUNetTrainer(object):
             l.backward()
             torch.nn.utils.clip_grad_norm_(self.network.parameters(), 12)
             self.optimizer.step()
-        return {'loss': l.detach().cpu().numpy()}
+
+        loss_dict['loss'] = l
+        for k, v in loss_dict.items():
+            loss_dict[k] = v.detach().cpu().numpy()
+        return loss_dict
 
     def on_train_epoch_end(self, train_outputs: List[dict]):
         outputs = collate_outputs(train_outputs)
@@ -944,21 +947,27 @@ class nnUNetTrainer(object):
             loss_here = np.vstack(losses_tr).mean()
         else:
             loss_here = np.mean(outputs['loss'])
+            ptls_here = np.mean(outputs['ptls'])
 
         self.logger.log('train_losses', loss_here, self.current_epoch)
+        self.logger.log("train_ptls", ptls_here, self.current_epoch)
 
     def on_validation_epoch_start(self):
         self.network.eval()
 
-    def validation_step(self, batch: dict) -> dict:
+    def validation_step(self, epoch, batch_id, batch: dict) -> dict:
         data = batch['data']
         target = batch['target']
+        predecessor = batch['predecessor']
+        soma = batch['soma']
 
         data = data.to(self.device, non_blocking=True)
         if isinstance(target, list):
             target = [i.to(self.device, non_blocking=True) for i in target]
         else:
             target = target.to(self.device, non_blocking=True)
+        predecessor = predecessor.to(self.device, non_blocking=True)
+        soma = soma.to(self.device, non_blocking=True)
 
         # Autocast can be annoying
         # If the device_type is 'cpu' then it's slow as heck and needs to be disabled.
@@ -967,7 +976,7 @@ class nnUNetTrainer(object):
         with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
             output = self.network(data)
             del data
-            l = self.loss(output, target)
+            l, loss_dict = self.loss(output, target)
 
         # we only need the output with the highest output resolution (if DS enabled)
         if self.enable_deep_supervision:
@@ -1012,7 +1021,13 @@ class nnUNetTrainer(object):
             fp_hard = fp_hard[1:]
             fn_hard = fn_hard[1:]
 
-        return {'loss': l.detach().cpu().numpy(), 'tp_hard': tp_hard, 'fp_hard': fp_hard, 'fn_hard': fn_hard}
+        loss_dict['loss'] = l
+        for k, v in loss_dict.items():
+            loss_dict[k] = v.detach().cpu().numpy()
+        loss_dict['tp_hard'] = tp_hard
+        loss_dict['fp_hard'] = fp_hard
+        loss_dict['fn_hard'] = fn_hard
+        return loss_dict
 
     def on_validation_epoch_end(self, val_outputs: List[dict]):
         outputs_collated = collate_outputs(val_outputs)
@@ -1040,12 +1055,14 @@ class nnUNetTrainer(object):
             loss_here = np.vstack(losses_val).mean()
         else:
             loss_here = np.mean(outputs_collated['loss'])
+            ptls_here = np.mean(outputs_collated['ptls'])
 
         global_dc_per_class = [i for i in [2 * i / (2 * i + j + k) for i, j, k in zip(tp, fp, fn)]]
         mean_fg_dice = np.nanmean(global_dc_per_class)
         self.logger.log('mean_fg_dice', mean_fg_dice, self.current_epoch)
         self.logger.log('dice_per_class_or_region', global_dc_per_class, self.current_epoch)
         self.logger.log('val_losses', loss_here, self.current_epoch)
+        self.logger.log("val_ptls", ptls_here, self.current_epoch)
 
     def on_epoch_start(self):
         self.logger.log('epoch_start_timestamps', time(), self.current_epoch)
@@ -1059,6 +1076,8 @@ class nnUNetTrainer(object):
                                                self.logger.my_fantastic_logging['dice_per_class_or_region'][-1]])
         self.print_to_log_file(
             f"Epoch time: {np.round(self.logger.my_fantastic_logging['epoch_end_timestamps'][-1] - self.logger.my_fantastic_logging['epoch_start_timestamps'][-1], decimals=2)} s")
+        self.print_to_log_file(f"train_ptls", np.round(self.logger.my_fantastic_logging['train_ptls'][-1], decimals=4))
+        self.print_to_log_file(f"val_ptls", np.round(self.logger.my_fantastic_logging['val_ptls'][-1], decimals=4))
 
         # handling periodic checkpointing
         current_epoch = self.current_epoch
