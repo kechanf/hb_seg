@@ -15,8 +15,9 @@ import math
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import pandas as pd
 
-def flip_and_resize_swc(img_path, swc_path, scale_factors, out_path=""):
+def flip_and_resize_swc(img_path, swc_path, scale_factors, pad_width, out_path=""):
     if (not out_path):
         out_path = swc_path[0:-4] + "_flip.swc"
     if (os.path.exists(out_path)):
@@ -33,13 +34,14 @@ def flip_and_resize_swc(img_path, swc_path, scale_factors, out_path=""):
     for line in lines:
         if (line[0] == '#'): continue
         temp_line = line.split()
-        temp_line[2] = str(float(temp_line[2]) * scale_factors[2])
-        temp_line[3] = str(y_limit - float(temp_line[3]) * scale_factors[1])
+        temp_line[2] = str((float(temp_line[2]) + pad_width[1]) * scale_factors[2])
+        temp_line[3] = str(y_limit - (float(temp_line[3]) + pad_width[0]) * scale_factors[1])
         temp_line[4] = str(float(temp_line[4]) * scale_factors[0])
+        temp_line[5] = str(float(temp_line[5]) * min(scale_factors))
         res_line = "%s %s %s %s %s %s %s\n" % (
             temp_line[0], temp_line[1], temp_line[2],
             temp_line[3],
-            temp_line[4], str(temp_line[5]), temp_line[6]
+            temp_line[4], temp_line[5], temp_line[6]
         )
         res_lines.append(res_line)
 
@@ -361,22 +363,36 @@ def dust_img(img_path, kern=3, out_path = ""):
 
     return out_path
 
+def get_spacing(img_path, raw_info_path="/data/kfchen/trace_ws/lab_info.xlsx"):
+
+    raw_info = pd.read_excel(raw_info_path)
+    preffix = img_path.split('/')[-1].split('.')[0]
+    spacing = raw_info[raw_info['number'] == float(preffix)][['resolution']].values[0]
+    return (1, float(spacing[0] / 1000), float(spacing[0] / 1000))
+
 def gen_seg_mask(origin_swc_path, img_path, target_img_dir, target_swc_dir, target_lab_dir, patch_size=(64, 256, 256)):
     file_name, extension = os.path.splitext(os.path.basename(origin_swc_path))
     target_img_path = os.path.join(target_img_dir, file_name + ".tif")
     target_swc_path = os.path.join(target_swc_dir, file_name + ".swc")
     target_lab_path = os.path.join(target_lab_dir, file_name + ".tif")
 
-    if(os.path.exists(target_lab_path)):
-        return
+    # if(os.path.exists(target_lab_path)):
+    #     return
 
     img = tifffile.imread(img_path)
-    scale_factors = [n / o for n, o in zip(patch_size, img.shape)]
-    if (not os.path.exists(target_img_path)):
-        img = scipy.ndimage.zoom(img, scale_factors, order=3)
-        tifffile.imwrite(target_img_path, img)
 
-    flip_path = flip_and_resize_swc(target_img_path, origin_swc_path, scale_factors, target_swc_path)
+    spacing = get_spacing(img_path)
+    pad_width = (int((1-spacing[1]) * img.shape[1]), int((1-spacing[2]) * img.shape[2]))
+    pad_params = ((0, 0),) + (pad_width,) * 2
+    img = np.pad(img, pad_width=pad_params, mode='constant', constant_values=0)
+    print(img.shape)
+
+    scale_factors = [n / o for n, o in zip(patch_size, img.shape)]
+    img = scipy.ndimage.zoom(img, scale_factors, order=3)
+    print(f"...", img.shape)
+    tifffile.imwrite(target_img_path, img)
+
+    flip_path = flip_and_resize_swc(target_img_path, origin_swc_path, scale_factors, pad_width, target_swc_path)
     sort_path = sort_swc(target_img_path, flip_path)
 
     soma_region_path = simple_soma_region(target_img_path)
@@ -413,11 +429,13 @@ def process_file(tif_file, tif_source_dir, swc_source_dir, target_img_dir, targe
         swc_file_path = os.path.join(swc_source_dir, tif_file[:-4] + ".swc")
         gen_seg_mask(swc_file_path, tif_file_path, target_img_dir, target_swc_dir, target_lab_dir)
     except:
-        print(f"tif_file {tif_file} failed")
+        print(f"Error: {tif_file}")
+
 
 def gen_mip(target_img_dir, target_lab_dir, target_mip_dir):
     tif_files = os.listdir(target_img_dir)
     tif_files = [f for f in tif_files if f.endswith(".tif")]
+    tif_files.sort()
     for tif_file in tif_files:
         tif_file_path = os.path.join(target_img_dir, tif_file)
 
@@ -442,10 +460,10 @@ if __name__ == "__main__":
     tif_source_dir = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/img/raw"
     swc_source_dir = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/label/origin_swc"
 
-    target_img_dir = r"/data/kfchen/trace_ws/resized_dataset/img"
-    target_swc_dir = r"/data/kfchen/trace_ws/resized_dataset/swc"
-    target_lab_dir = r"/data/kfchen/trace_ws/resized_dataset/lab"
-    target_mip_dir = r"/data/kfchen/trace_ws/resized_dataset/mip"
+    target_img_dir = r"/data/kfchen/trace_ws/resized_dataset3/img"
+    target_swc_dir = r"/data/kfchen/trace_ws/resized_dataset3/swc"
+    target_lab_dir = r"/data/kfchen/trace_ws/resized_dataset3/lab"
+    target_mip_dir = r"/data/kfchen/trace_ws/resized_dataset3/mip"
     if (not os.path.exists(target_img_dir)): os.makedirs(target_img_dir)
     if (not os.path.exists(target_swc_dir)): os.makedirs(target_swc_dir)
     if (not os.path.exists(target_lab_dir)): os.makedirs(target_lab_dir)
@@ -457,7 +475,9 @@ if __name__ == "__main__":
 
     tif_files = os.listdir(tif_source_dir)
     tif_files = [f for f in tif_files if f.endswith(".tif")]
-    with ThreadPoolExecutor(max_workers=12) as executor:
+    # tif_files = tif_files[:10]
+
+    with ThreadPoolExecutor(max_workers=24) as executor:
         # 使用tqdm显示进度条
         for _ in tqdm(executor.map(process_file, tif_files, [tif_source_dir] * len(tif_files),
                                    [swc_source_dir] * len(tif_files),
@@ -467,7 +487,7 @@ if __name__ == "__main__":
             pass
 
 
-    # gen_mip(target_img_dir, target_lab_dir, target_mip_dir)
+    gen_mip(target_img_dir, target_lab_dir, target_mip_dir)
 
     # del swc dir
     # if (os.path.exists(target_swc_dir)): os.removedirs(target_swc_dir)

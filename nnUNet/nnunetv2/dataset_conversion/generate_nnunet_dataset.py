@@ -11,6 +11,7 @@ from tifffile import imread, imwrite
 import numpy as np
 from skimage.measure import block_reduce
 from pylib.file_io import load_image
+import cc3d
 
 def delete_non_shared_files(img_folder, mask_folder):
     print(f"Deleting non-shared files in {img_folder} and {mask_folder}...")
@@ -155,9 +156,6 @@ def generate_train_data(images_dir, seg_dir, imagestr, labelstr,
     segs.sort()
     ids = [int(im[:-4].split('/')[-1].split('_')[0]) for im in images]
     # print(len(images), len(segs), len(ids))
-    print(images)
-    print(segs)
-    print(ids)
 
     if(debug):
         images = images[:10]
@@ -182,20 +180,31 @@ def generate_train_data(images_dir, seg_dir, imagestr, labelstr,
         # print(target_name)
 
         # spacing = get_spacing(im, raw_info_path)
-        resol = label_info[label_info['number'] == int(im.split('/')[-1].split('.')[0])][['resolution']].values[0]
-        spacing = (1, resol[0] / 1000, resol[0] / 1000)
+        # resol = label_info[label_info['number'] == int(im.split('/')[-1].split('.')[0])][['resolution']].values[0]
+        # spacing = (1, resol[0] / 1000, resol[0] / 1000)
+        spacing = (1, 1, 1)
 
         img = imread(join(images_dir, im))
+        img_seg = imread(join(seg_dir, se))
+
+
+        _, N = cc3d.connected_components(img_seg, connectivity=26, return_N=True)
+        if(N > 1):
+            print(f"Skip {im} because of {N} neurons")
+            continue
+
         img_size = img.shape
         img = augment_gamma(img, gamma_range=(0.5, 0.5))
         img = img.astype(np.uint8)
         tifffile.imwrite(join(imagestr, target_name + '_0000.tif'), img)
         save_json({'spacing': spacing}, join(imagestr, target_name + '.json'))
 
-        img = imread(join(seg_dir, se))
-        img = np.where(img > 0, 1, 0).astype("uint8")
-        tifffile.imwrite(join(labelstr, target_name + '.tif'), img)
+
+        img_seg = np.where(img_seg > 0, 1, 0).astype("uint8")
+        tifffile.imwrite(join(labelstr, target_name + '.tif'), img_seg)
         save_json({'spacing': spacing}, join(labelstr, target_name + '.json'))
+
+        print(img.shape, img_seg.shape)
 
         temp_im = im.split('/')[-1]
         if (im.endswith('.tif')):
@@ -217,11 +226,14 @@ def generate_train_data(images_dir, seg_dir, imagestr, labelstr,
     df.to_csv(csv_path, index=False)
     progress_bar.close()
 
+    done_files = os.listdir(imagestr)
+    done_files = [file for file in done_files if file.endswith('.tif')]
+
     generate_dataset_json(
         join(nnUNet_raw, dataset_name),
         {0: 'mi'},
         {'background': 0, 'neuron': 1},
-        len(images),
+        len(done_files),
         '.tif'
     )
 
@@ -347,11 +359,11 @@ if __name__ == '__main__':
     label_info_path = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/label/label_info.xlsx"
 
     # dataset_name = 'Dataset101_human_brain_10000_ssoma_test'
-    dataset_name = 'Dataset163_human_brain_resized_10k_source'
+    dataset_name = 'Dataset164_human_brain_resized_10k_source'
     # images_dir = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/image"
     # seg_dir = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/label"
-    images_dir = "/data/kfchen/trace_ws/resized_dataset/img"
-    seg_dir = "/data/kfchen/trace_ws/resized_dataset/lab"
+    images_dir = "/data/kfchen/trace_ws/resized_dataset2/img"
+    seg_dir = "/data/kfchen/trace_ws/resized_dataset2/lab"
     test_source = "/PBshare/SEU-ALLEN/Projects/Human_Neurons/all_human_cells/all_human_cells_v3draw"
     imagestr = join(nnUNet_raw, dataset_name, "imagesTr")
     labelstr = join(nnUNet_raw, dataset_name, "labelsTr")
