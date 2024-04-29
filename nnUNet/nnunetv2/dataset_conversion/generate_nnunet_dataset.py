@@ -204,8 +204,6 @@ def generate_train_data(images_dir, seg_dir, imagestr, labelstr,
         tifffile.imwrite(join(labelstr, target_name + '.tif'), img_seg)
         save_json({'spacing': spacing}, join(labelstr, target_name + '.json'))
 
-        print(img.shape, img_seg.shape)
-
         temp_im = im.split('/')[-1]
         if (im.endswith('.tif')):
             temp_im = im[:-4]
@@ -359,7 +357,7 @@ if __name__ == '__main__':
     label_info_path = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/label/label_info.xlsx"
 
     # dataset_name = 'Dataset101_human_brain_10000_ssoma_test'
-    dataset_name = 'Dataset164_human_brain_resized_10k_source'
+    dataset_name = 'Dataset165_human_brain_resized_10k_ptls'
     # images_dir = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/image"
     # seg_dir = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/label"
     images_dir = "/data/kfchen/trace_ws/resized_dataset2/img"

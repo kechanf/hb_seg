@@ -460,10 +460,10 @@ if __name__ == "__main__":
     tif_source_dir = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/img/raw"
     swc_source_dir = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/label/origin_swc"
 
-    target_img_dir = r"/data/kfchen/trace_ws/resized_dataset3/img"
-    target_swc_dir = r"/data/kfchen/trace_ws/resized_dataset3/swc"
-    target_lab_dir = r"/data/kfchen/trace_ws/resized_dataset3/lab"
-    target_mip_dir = r"/data/kfchen/trace_ws/resized_dataset3/mip"
+    target_img_dir = r"/data/kfchen/trace_ws/resized_dataset2/img"
+    target_swc_dir = r"/data/kfchen/trace_ws/resized_dataset2/swc"
+    target_lab_dir = r"/data/kfchen/trace_ws/resized_dataset2/lab"
+    target_mip_dir = r"/data/kfchen/trace_ws/resized_dataset2/mip"
     if (not os.path.exists(target_img_dir)): os.makedirs(target_img_dir)
     if (not os.path.exists(target_swc_dir)): os.makedirs(target_swc_dir)
     if (not os.path.exists(target_lab_dir)): os.makedirs(target_lab_dir)
