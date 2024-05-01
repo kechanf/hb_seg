@@ -6,6 +6,7 @@ import os
 import numpy as np
 import scipy.ndimage
 import matplotlib.pyplot as plt
+import tifffile
 
 def normalize_mip(img):
     # Normalize image
@@ -51,7 +52,7 @@ class TestTransform(AbstractTransform):
         self.patch_size = patch_size
 
     def __call__(self, **data_dict):
-        print(f"shape {data_dict['seg'].shape}, {data_dict['data'].shape}")
+        # print(f"shape {data_dict['seg'].shape}, {data_dict['data'].shape} in TestTransform")
         # shape(2, 1, 48, 263, 263), (2, 1, 48, 263, 263)
 
         num_batches = data_dict['seg'].shape[0]
@@ -80,7 +81,7 @@ class TestTransform(AbstractTransform):
             # print(f"seg_resized shape {seg_resized.shape}, seg shape {seg.shape}")
             # seg_resized shape (48, 224, 224), seg shape (48, 263, 263)
 
-            generate_mip_images(data, seg)
+            # generate_mip_images(data, seg)
 
             scaled_data.append(data)
             scaled_seg.append(seg)
@@ -91,3 +92,32 @@ class TestTransform(AbstractTransform):
         data_dict['seg'] = np.array(scaled_seg)
 
         return data_dict
+
+if __name__ == "__main__":
+    data_dir = "/data/kfchen/nnUNet/nnUNet_raw/Dataset165_human_brain_resized_10k_ptls/imagesTr"
+    seg_dir = "/data/kfchen/nnUNet/nnUNet_raw/Dataset165_human_brain_resized_10k_ptls/labelsTr"
+
+    data_files = os.listdir(data_dir)
+    seg_files = os.listdir(seg_dir)
+
+    data_files = [file for file in data_files if file.endswith(".tif")]
+    seg_files = [file for file in seg_files if file.endswith(".tif")]
+
+    data_files.sort()
+    seg_files.sort()
+
+    for i in range(len(data_files)):
+        data_file = data_files[i]
+        seg_file = seg_files[i]
+
+        data_path = os.path.join(data_dir, data_file)
+        seg_path = os.path.join(seg_dir, seg_file)
+
+        data = np.array(tifffile.imread(data_path))
+        seg = np.array(tifffile.imread(seg_path))
+
+        if(not data.shape == (64, 256, 256) or not seg.shape == (64, 256, 256)):
+            print(data_path, seg_path)
+            print(data.shape, seg.shape)
+            continue
+

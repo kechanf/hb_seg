@@ -53,7 +53,7 @@ class DC_and_CE_loss(nn.Module):
             if self.weight_ce != 0 and (self.ignore_label is None or num_fg > 0) else 0
 
         result = self.weight_ce * ce_loss + self.weight_dice * dc_loss
-        loss_dict['ce'] = ce_loss
+        loss_dict['ce'] = ce_loss.detach().cpu().numpy()
         return result, loss_dict
 
 

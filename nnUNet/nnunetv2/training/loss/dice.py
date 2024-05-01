@@ -128,8 +128,8 @@ class MemoryEfficientSoftDiceLoss(nn.Module):
         return pathloss
 
     def forward(self, x, y, loss_mask=None, predecessor=None, soma=None, ptls_switch=True):
-        print(len(x), len(y))
-        print(f"x.shape, y.shape: {x[0].shape}, {y[0].shape}")
+        # print(len(x), len(y))
+        print(f"x.shape, y.shape: {x[0].shape}, {y[0].shape} in MemoryEfficientSoftDiceLoss.forward()")
         if self.apply_nonlin is not None:
             x = self.apply_nonlin(x)
 
@@ -137,13 +137,13 @@ class MemoryEfficientSoftDiceLoss(nn.Module):
         axes = tuple(range(2, x.ndim))
 
         dc = self.calc_diceloss(x, y, axes, loss_mask)
-        print("fuck")
+        # print("fuck")
         if(ptls_switch):
             ptls = self.calc_npathloss(x, y, predecessor, axes, num_paths=50, soma=soma)
-            print(ptls)
-            return -dc + ptls, {"dc": -dc, "ptls": ptls}
+            print(f"dc, ptls, -dc+ptls: {-dc.detach().cpu().numpy(), ptls.detach().cpu().numpy(), -dc + ptls}")
+            return -dc, {"dc": -dc.detach().cpu().numpy(), "ptls": ptls.detach().cpu().numpy()}
 
-        return -dc, {"dc": -dc}
+        return -dc, {"dc": -dc.detach().cpu().numpy()}
 
 
 def get_tp_fp_fn_tn(net_output, gt, axes=None, mask=None, square=False):

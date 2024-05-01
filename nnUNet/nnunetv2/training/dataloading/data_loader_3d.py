@@ -7,6 +7,7 @@ class nnUNetDataLoader3D(nnUNetDataLoaderBase):
     def generate_train_batch(self):
         selected_keys = self.get_indices()
         # preallocate memory for data and seg
+        # print(f"self.data_shape, self.seg_shape {self.data_shape, self.seg_shape} in nnUNetDataLoader3D generate_train_batch")
         data_all = np.zeros(self.data_shape, dtype=np.float32)
         seg_all = np.zeros(self.seg_shape, dtype=np.int16)
         case_properties = []
@@ -17,6 +18,7 @@ class nnUNetDataLoader3D(nnUNetDataLoaderBase):
             force_fg = self.get_do_oversample(j)
 
             data, seg, properties = self._data.load_case(i)
+            # print(f"data.shape, seg.shape {data.shape, seg.shape} in nnUNetDataLoader3D load_case")
             case_properties.append(properties)
 
             # If we are doing the cascade then the segmentation from the previous stage will already have been loaded by
@@ -43,9 +45,11 @@ class nnUNetDataLoader3D(nnUNetDataLoaderBase):
             seg = seg[this_slice]
 
             padding = [(-min(0, bbox_lbs[i]), max(bbox_ubs[i] - shape[i], 0)) for i in range(dim)]
+            # print(f"padding: {padding}")
             padding = ((0, 0), *padding)
             data_all[j] = np.pad(data, padding, 'constant', constant_values=0)
             seg_all[j] = np.pad(seg, padding, 'constant', constant_values=-1)
+            # print(f"data_all[j].shape, seg_all[j].shape {data_all[j].shape, seg_all[j].shape} in nnUNetDataLoader3D")
 
         return {'data': data_all, 'seg': seg_all, 'properties': case_properties, 'keys': selected_keys}
 

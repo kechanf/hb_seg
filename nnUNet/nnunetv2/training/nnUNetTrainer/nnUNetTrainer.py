@@ -386,6 +386,7 @@ class nnUNetTrainer(object):
         This function is stupid and certainly one of the weakest spots of this implementation. Not entirely sure how we can fix it.
         """
         patch_size = self.configuration_manager.patch_size
+        # print(f"!!!!!!!!!!!!!!!!!!!!!!!!patch_size {patch_size} in configure_rotation_dummyDA_mirroring_and_inital_patch_size")
         dim = len(patch_size)
         # todo rotation should be defined dynamically based on patch size (more isotropic patch sizes = more rotation)
         if dim == 2:
@@ -427,9 +428,10 @@ class nnUNetTrainer(object):
 
         # todo this function is stupid. It doesn't even use the correct scale range (we keep things as they were in the
         #  old nnunet for now)
-        initial_patch_size = get_patch_size(patch_size[-dim:],
-                                            *rotation_for_DA.values(),
-                                            (0.85, 1.25))
+        # initial_patch_size = get_patch_size(patch_size[-dim:],
+        #                                     *rotation_for_DA.values(),
+        #                                     (0.85, 1.25))
+        initial_patch_size = patch_size
         if do_dummy_2d_data_aug:
             initial_patch_size[0] = patch_size[0]
 
@@ -918,7 +920,7 @@ class nnUNetTrainer(object):
         # So autocast will only be active if we have a cuda device.
         with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
             output = self.network(data)
-            self.save_mip(epoch, batch_id, "train", data, target, output)
+            # self.save_mip(epoch, batch_id, "train", data, target, output)
             # del data
             l, loss_dict = self.loss(output, target, predecessor, soma)
 
@@ -933,9 +935,10 @@ class nnUNetTrainer(object):
             torch.nn.utils.clip_grad_norm_(self.network.parameters(), 12)
             self.optimizer.step()
 
-        loss_dict['loss'] = l
-        for k, v in loss_dict.items():
-            loss_dict[k] = v.detach().cpu().numpy()
+        loss_dict['loss'] = l.detach().cpu().numpy()
+        # loss_dict['loss'] = l
+        # for k, v in loss_dict.items():
+        #     loss_dict[k] = v.detach().cpu().numpy()
         return loss_dict
 
     def on_train_epoch_end(self, train_outputs: List[dict]):
