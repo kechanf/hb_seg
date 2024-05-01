@@ -70,6 +70,15 @@ class MemoryEfficientSoftDiceLoss(nn.Module):
         self.ddp = ddp
 
     def forward(self, x, y, loss_mask=None):
+        print(x.shape, y.shape)
+        '''
+        deep supervision on
+        print(x.shape, y.shape)
+        torch.Size([2, 2, 64, 256, 256]) torch.Size([2, 1, 64, 256, 256])
+        torch.Size([2, 2, 32, 128, 128]) torch.Size([2, 1, 32, 128, 128])
+        torch.Size([2, 2, 16, 64, 64]) torch.Size([2, 1, 16, 64, 64])
+        torch.Size([2, 2, 8, 32, 32]) torch.Size([2, 1, 8, 32, 32])
+        '''
         if self.apply_nonlin is not None:
             x = self.apply_nonlin(x)
 
