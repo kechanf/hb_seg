@@ -5,6 +5,7 @@ from nnunetv2.utilities.ddp_allgather import AllGatherGrad
 from torch import nn
 import numpy as np
 from nnunetv2.training.loss.npathloss import npathloss
+import time
 
 
 class SoftDiceLoss(nn.Module):
@@ -129,7 +130,7 @@ class MemoryEfficientSoftDiceLoss(nn.Module):
 
     def forward(self, x, y, loss_mask=None, predecessor=None, soma=None, ptls_switch=True):
         # print(len(x), len(y))
-        print(f"x.shape, y.shape: {x[0].shape}, {y[0].shape} in MemoryEfficientSoftDiceLoss.forward()")
+        # print(f"x.shape, y.shape: {x.shape}, {y.shape} in MemoryEfficientSoftDiceLoss.forward()")
         if self.apply_nonlin is not None:
             x = self.apply_nonlin(x)
 
@@ -139,8 +140,10 @@ class MemoryEfficientSoftDiceLoss(nn.Module):
         dc = self.calc_diceloss(x, y, axes, loss_mask)
         # print("fuck")
         if(ptls_switch):
+            # time1 = time.time()
             ptls = self.calc_npathloss(x, y, predecessor, axes, num_paths=50, soma=soma)
-            print(f"dc, ptls, -dc+ptls: {-dc.detach().cpu().numpy(), ptls.detach().cpu().numpy(), -dc + ptls}")
+            # print(f"time cost = {time.time() - time1}")
+            # print(f"dc, ptls, -dc+ptls: {-dc.detach().cpu().numpy(), ptls.detach().cpu().numpy(), -dc + ptls}")
             return -dc, {"dc": -dc.detach().cpu().numpy(), "ptls": ptls.detach().cpu().numpy()}
 
         return -dc, {"dc": -dc.detach().cpu().numpy()}
@@ -222,10 +225,11 @@ def get_pathloss(net_output, gt, seg, predecessor, axes=None, num_paths=10, soma
 
     ptls = torch.zeros((shp_x[0], shp_x[1]), device=net_output.device)
     for batch in range(shp_x[0]):
+        # print("----fuck--------------------------------")
         # print(f"len: {len(net_output)}, {len(gt)}, {len(seg)}, {len(predecessor)}, {len(soma)}")
         # print(f"gtshape: {gt.shape}, net_outputshape: {net_output.shape}, segshape: {seg.shape}, predecessorshape: {predecessor.shape}, somashape: {soma.shape}")
-        # print(f"gtpathloss: {gt[batch, 0, ...].shape}, net_output: {net_output[batch, 0, ...].shape}, seg: {seg[batch, 0, ...].shape}, predecessor: {predecessor[batch, 0, ...].shape}, soma: {soma[batch, 0, ...].shape}"
-        # print(current_soma)
+        # print(f"gtpathloss: {gt[batch, 0, ...].shape}, net_output: {net_output[batch, 0, ...].shape}, seg: {seg[batch, 0, ...].shape}, predecessor: {predecessor[batch, 0, ...].shape}, soma: {soma[batch, 0, ...].shape}")
+        # print(soma[batch, 0, ...])
         # print(ptls.shape, batch)
         x = npathloss(gt[batch, 0, ...], net_output[batch, 0, ...],
                                 seg[batch, 0, ...], predecessor[batch, 0, ...],

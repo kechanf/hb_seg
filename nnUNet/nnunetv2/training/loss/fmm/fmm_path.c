@@ -7039,7 +7039,7 @@ static PyObject *__pyx_pf_8fmm_path_8calculate_path_loss_mask(CYTHON_UNUSED PyOb
  *         if not continue_from_soma_flag:
  *             mask_path_from_soma[point] = 1             # <<<<<<<<<<<<<<
  * 
- *     return mask_path, mask_path_from_soma
+ *     return mask_path, mask_path_from_soma, len(path)
  */
       if (unlikely((PyObject_SetItem(__pyx_v_mask_path_from_soma, __pyx_v_point, __pyx_int_1) < 0))) __PYX_ERR(0, 109, __pyx_L1_error)
 
@@ -7065,21 +7065,27 @@ static PyObject *__pyx_pf_8fmm_path_8calculate_path_loss_mask(CYTHON_UNUSED PyOb
   /* "fmm_path.pyx":111
  *             mask_path_from_soma[point] = 1
  * 
- *     return mask_path, mask_path_from_soma             # <<<<<<<<<<<<<<
- * 
+ *     return mask_path, mask_path_from_soma, len(path)             # <<<<<<<<<<<<<<
+ *     # return mask_path, None
  * 
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_5 = PyTuple_New(2); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 111, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_PyList_GET_SIZE(__pyx_v_path); if (unlikely(__pyx_t_7 == ((Py_ssize_t)-1))) __PYX_ERR(0, 111, __pyx_L1_error)
+  __pyx_t_5 = PyInt_FromSsize_t(__pyx_t_7); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 111, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
+  __pyx_t_6 = PyTuple_New(3); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 111, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_6);
   __Pyx_INCREF(__pyx_v_mask_path);
   __Pyx_GIVEREF(__pyx_v_mask_path);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_5, 0, __pyx_v_mask_path)) __PYX_ERR(0, 111, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_6, 0, __pyx_v_mask_path)) __PYX_ERR(0, 111, __pyx_L1_error);
   __Pyx_INCREF(__pyx_v_mask_path_from_soma);
   __Pyx_GIVEREF(__pyx_v_mask_path_from_soma);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_5, 1, __pyx_v_mask_path_from_soma)) __PYX_ERR(0, 111, __pyx_L1_error);
-  __pyx_r = __pyx_t_5;
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_6, 1, __pyx_v_mask_path_from_soma)) __PYX_ERR(0, 111, __pyx_L1_error);
+  __Pyx_GIVEREF(__pyx_t_5);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_6, 2, __pyx_t_5)) __PYX_ERR(0, 111, __pyx_L1_error);
   __pyx_t_5 = 0;
+  __pyx_r = __pyx_t_6;
+  __pyx_t_6 = 0;
   goto __pyx_L0;
 
   /* "fmm_path.pyx":95

@@ -108,7 +108,8 @@ def calculate_path_loss_mask(predecessor_clone, bin_pred, start_point, soma_clon
         if not continue_from_soma_flag:
             mask_path_from_soma[point] = 1
 
-    return mask_path, mask_path_from_soma
+    return mask_path, mask_path_from_soma, len(path)
+    # return mask_path, None
 
 
 

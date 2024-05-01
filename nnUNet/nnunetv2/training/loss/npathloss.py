@@ -9,6 +9,10 @@ from scipy.ndimage.morphology import binary_dilation
 
 import os
 from nnunetv2.training.loss.fmm.fmm_path import calculate_path_loss_mask
+from concurrent.futures import ThreadPoolExecutor
+
+import cProfile
+import pstats
 
 
 def soma_cc_ndimage(image, source):
@@ -110,13 +114,32 @@ def find_foreground_points(binary_image):
 
     return foreground_points
 
+def process_point(start_point, predecessor_clone, bin_pred, soma_clone, threshold, pred, pt_loss, smooth):
+    mask_path, mask_path_from_soma = calculate_path_loss_mask(predecessor_clone, bin_pred, start_point, soma_clone, threshold)
+    mask_path = torch.from_numpy(mask_path).to(pred.device)
+    mask_path_from_soma = torch.from_numpy(mask_path_from_soma).to(pred.device)
+
+    ptls1 = (threshold - pred) * mask_path
+    ptls1 = torch.relu(ptls1)
+    ptls2 = (1 - pred) * mask_path_from_soma
+
+    current_pt_loss = (torch.sum(ptls1)) / (mask_path.sum() * 0.5 + smooth)
+    regu_lambda = 1e-2
+    regu_loss = pred * mask_path * regu_lambda
+    regu_loss = torch.sum(regu_loss) / (mask_path.sum() + smooth)
+    current_pt_loss = (current_pt_loss + regu_loss)
+
+    return current_pt_loss
+
 def npathloss(gt, pred, seg, predecessor, num_paths=10, soma=None, debug=False, threshold=0.5, smooth=1e-8):
+    # profiler = cProfile.Profile()
+    # profiler.enable()
+
     if(soma is None or predecessor is None):
         return 0
 
     # print(num_paths)
     gt_clone = gt.detach().clone().cpu().numpy()
-    pred_clone = pred.detach().clone().cpu().numpy()
     predecessor_clone = predecessor.detach().clone().cpu().numpy()
     soma_clone = soma.detach().clone().cpu().numpy()
     soma_clone = tuple([int(soma_clone[0]), int(soma_clone[1]), int(soma_clone[2])])
@@ -124,12 +147,12 @@ def npathloss(gt, pred, seg, predecessor, num_paths=10, soma=None, debug=False, 
         # print('fuck0')
         return 0
     # print(f"max {max(seg.flatten())}, min {min(seg.flatten())}")
-    if(sum(predecessor_clone.flatten()) == -1 * len(predecessor_clone.flatten())):
-        # print('fuck0')
-        return 0
-    if(sum(seg.flatten()) / (seg.shape[0] * seg.shape[1] * seg.shape[2]) > 0.02):
-        # print("fuck0")
-        return 0
+    # if(sum(predecessor_clone.flatten()) == -1 * len(predecessor_clone.flatten())):
+    #     # print('fuck0')
+    #     return 0
+    # if(sum(seg.flatten()) / (seg.shape[0] * seg.shape[1] * seg.shape[2]) > 0.02):
+    #     # print("fuck0")
+    #     return 0
     bin_pred = seg
     # bin_pred = binary_erosion(bin_pred, iterations=3)
     soma_cc = soma_cc_cc3d(bin_pred, soma_clone)
@@ -145,8 +168,10 @@ def npathloss(gt, pred, seg, predecessor, num_paths=10, soma=None, debug=False, 
 
     if (debug):
         paths = []
+
+
     for start_point in rand_points:
-        mask_path, mask_path_from_soma = calculate_path_loss_mask(predecessor_clone, bin_pred, start_point, soma_clone, threshold)
+        mask_path, mask_path_from_soma, path_len = calculate_path_loss_mask(predecessor_clone, bin_pred, start_point, soma_clone, threshold)
         mask_path = torch.from_numpy(mask_path).to(pred.device)
         mask_path_from_soma = torch.from_numpy(mask_path_from_soma).to(pred.device)
 
@@ -154,21 +179,27 @@ def npathloss(gt, pred, seg, predecessor, num_paths=10, soma=None, debug=False, 
         ptls1 = torch.relu(ptls1)
         ptls2 = (1 - pred) * mask_path_from_soma
 
-        # print(f"torch.sum(ptls1) * torch.sum(ptls2) {torch.sum(ptls1)} {torch.sum(ptls2)}")
-        current_pt_loss = (torch.sum(ptls1)) / (mask_path.sum() * 0.5 + smooth)
-        # regularize the path loss
-        regu_lambda = 1e-5
-        regu_loss = pred * mask_path * 1e-2
-        #  L2 范数的平方
-        # regu_loss = torch.sum(pred ** 2) * regu_lambda
-        regu_loss = torch.sum(regu_loss) / (mask_path.sum() + smooth)
-        current_pt_loss = (current_pt_loss + regu_loss)
-        # print(current_pt_loss)
-        # print(f"torch.sum(ptls1): {torch.sum(ptls1)}, torch.sum(regu_loss): {torch.sum(regu_loss)} ")
+        current_pt_loss = (torch.sum(ptls1)) / (path_len * 0.5 + smooth)
 
-        # pt_loss = pt_loss + (torch.sum(ptls1) + smooth) * (torch.sum(ptls2) + smooth) / (mask_path.sum() ** 2 * 0.5)
+        # regularize the path loss
+        regu_lambda = 1e-2
+        regu_loss = pred * mask_path * regu_lambda # L1
+        # regu_loss = torch.sum(pred ** 2) * regu_lambda # L2
+        regu_loss = torch.sum(regu_loss) / (path_len + smooth)
+
+        current_pt_loss = (current_pt_loss + regu_loss)
+
+        # pt_loss = pt_loss + (torch.sum(ptls1) + smooth) * (torch.sum(ptls2) + smooth) / (path_len ** 2 * 0.5)
         pt_loss = pt_loss + current_pt_loss
 
 
-    # print(f"pt_loss {pt_loss}, rand_points {len(rand_points)}")
+    # with ThreadPoolExecutor(max_workers=12) as executor:
+    #     futures = [executor.submit(process_point, start_point, predecessor_clone, bin_pred, soma_clone, threshold, pred, pt_loss, smooth) for start_point in rand_points]
+    #     results = [f.result() for f in futures]
+    #     pt_loss = sum(results)
+
+    # profiler.disable()
+    # stats = pstats.Stats(profiler).sort_stats('cumulative')
+    # stats.print_stats()
+
     return pt_loss / (len(rand_points) + smooth)

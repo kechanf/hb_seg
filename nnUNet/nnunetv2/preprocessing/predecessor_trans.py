@@ -3,6 +3,7 @@ import numpy as np
 from nnunetv2.training.loss.fmm.fmm_process import get_fmm_from_img
 import time
 import os
+import cc3d
 
 
 class AddPredecessorImageTransform(AbstractTransform):
@@ -26,7 +27,6 @@ class AddPredecessorImageTransform(AbstractTransform):
         for batch_idx in range(target.shape[0]):
             for channel_idx in range(target.shape[1]):
                 current_target = target[batch_idx, channel_idx]
-
                 current_predecessor, current_soma = get_fmm_from_img(current_target)
                 if((current_predecessor is None) or (current_soma is None)):
                     # print("... no predecessor found for batch_idx: ", batch_idx, " channel_idx: ", channel_idx)

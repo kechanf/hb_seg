@@ -144,11 +144,11 @@ class nnUNetTrainer(object):
                 if self.is_cascaded else None
 
         ### Some hyperparameters for you to fiddle with
-        self.initial_lr = 1e-2
+        self.initial_lr = 1e-3
         self.weight_decay = 3e-5
         self.oversample_foreground_percent = 0.33
-        self.num_iterations_per_epoch = 10
-        self.num_val_iterations_per_epoch = 10
+        self.num_iterations_per_epoch = 250
+        self.num_val_iterations_per_epoch = 50
         self.num_epochs = 1000
         self.current_epoch = 0
         self.enable_deep_supervision = False
@@ -951,6 +951,7 @@ class nnUNetTrainer(object):
         else:
             loss_here = np.mean(outputs['loss'])
             ptls_here = np.mean(outputs['ptls'])
+            # print(f"ptls_here: {ptls_here}")
 
         self.logger.log('train_losses', loss_here, self.current_epoch)
         self.logger.log("train_ptls", ptls_here, self.current_epoch)
@@ -971,6 +972,7 @@ class nnUNetTrainer(object):
             target = target.to(self.device, non_blocking=True)
         predecessor = predecessor.to(self.device, non_blocking=True)
         soma = soma.to(self.device, non_blocking=True)
+        # print(f"predecessor.shape: {predecessor.shape}, soma.shape: {soma.shape} in validation_step")
 
         # Autocast can be annoying
         # If the device_type is 'cpu' then it's slow as heck and needs to be disabled.
@@ -979,7 +981,7 @@ class nnUNetTrainer(object):
         with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
             output = self.network(data)
             del data
-            l, loss_dict = self.loss(output, target)
+            l, loss_dict = self.loss(output, target, predecessor, soma)
 
         # we only need the output with the highest output resolution (if DS enabled)
         if self.enable_deep_supervision:
@@ -1024,9 +1026,7 @@ class nnUNetTrainer(object):
             fp_hard = fp_hard[1:]
             fn_hard = fn_hard[1:]
 
-        loss_dict['loss'] = l
-        for k, v in loss_dict.items():
-            loss_dict[k] = v.detach().cpu().numpy()
+        loss_dict['loss'] = l.detach().cpu().numpy()
         loss_dict['tp_hard'] = tp_hard
         loss_dict['fp_hard'] = fp_hard
         loss_dict['fn_hard'] = fn_hard
@@ -1321,7 +1321,7 @@ class nnUNetTrainer(object):
                 self.on_validation_epoch_start()
                 val_outputs = []
                 for batch_id in range(self.num_val_iterations_per_epoch):
-                    val_outputs.append(self.validation_step(next(self.dataloader_val)))
+                    val_outputs.append(self.validation_step(epoch, batch_id, next(self.dataloader_val)))
                 self.on_validation_epoch_end(val_outputs)
 
             self.on_epoch_end()

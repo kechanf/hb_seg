@@ -6,6 +6,7 @@ from nnunetv2.training.loss.fmm.fmm_path import compute_fast_marching
 import tifffile
 import subprocess
 import sys
+import matplotlib.pyplot as plt
 
 def compute_centroid(mask):
     # 使用 cc3d 对3D mask进行连通区域标记
@@ -68,10 +69,41 @@ def simple_get_soma(img, img_path, temp_path=r"/home/kfchen/temp_tif", v3d_path=
 
     return centroid
 
+
+def muti_cc_image_check(image):
+    # 计算连通块
+    labels_out, N = cc3d.connected_components(image, connectivity=26, return_N=True)
+
+    # 检查连通块数量
+    if N > 1:
+        # print(f"图像中有 {N} 个连通块。")
+        # # 计算每个连通块的大小
+        # component_sizes = np.bincount(labels_out.flatten())[1:]  # 忽略背景
+        # for i, size in enumerate(component_sizes, 1):
+        #     print(f"连通块 {i} 的大小为: {size}")
+
+        if(N > 5):
+            # 保存MIP图
+            save_mip_image(image)
+            return True
+        return False
+    else:
+        return False
+
+
+def save_mip_image(image, filename='', temp_dir="/data/kfchen/nnUNet/temp_mip"):
+    if(filename == ''):
+        filename = str(np.random.randint(0, 100000)) + '.png'
+    mip = np.max(image, axis=0)
+    plt.imshow(mip, cmap='gray')
+    plt.axis('off')
+    plt.title('Maximum Intensity Projection')
+    plt.savefig(os.path.join(temp_dir, filename))
+    plt.close()
+    print(f"MIP图已保存为 {filename}")
+
 def get_fmm_from_img(img, temp_path=r"/home/kfchen/temp_tif", source=None):
-    _, cc_num = cc3d.connected_components(img, connectivity=26, return_N=True)
-    if(not (cc_num == 1)):
-        # print(f"not (cc_num == 1), cc_num={cc_num}")
+    if(muti_cc_image_check(img)):
         return None, None
     # rand path
     random_path = np.random.randint(0, 100000) + (img.shape[0] * img.shape[1] * img.shape[2])
