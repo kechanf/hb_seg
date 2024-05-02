@@ -435,12 +435,12 @@ def get_soma_region(img_path, marker_path=None):
     out_tmp = in_tmp.replace('.tif', '_gsdt.tif')
 
     if (sys.platform == "linux"):
-        cmd_str = f'xvfb-run -a -s "-screen 0 640x480x16" {v3d_path} -x gsdt -f gsdt -i "{in_tmp}" -o "{out_tmp}" -p 0 1 0 1.5'
+        cmd_str = f'xvfb-run -a -s "-screen 0 640x480x16" {v3d_path} -x gsdt -f gsdt -i {in_tmp} -o {out_tmp} -p 0 1 0 1.5'
         cmd_str = process_path(cmd_str)
         # print(cmd_str)
         subprocess.run(cmd_str, stdout=subprocess.DEVNULL, shell=True)
     else:
-        cmd = f'{v3d_path} /x gsdt /f gsdt /i "{in_tmp}" /o "{out_tmp}" /p 0 1 0 1.5'
+        cmd = f'{v3d_path} /x gsdt /f gsdt /i {in_tmp} /o {out_tmp} /p 0 1 0 1.5'
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
     pred = tifffile.imread(img_path).astype(np.uint8)
@@ -470,8 +470,8 @@ def get_soma_region(img_path, marker_path=None):
         del pred, gsdt, max_gsdt
 
         soma_region, original_shape, min_coords = crop_nonzero(soma_region)
-        soma_region = opening_get_soma_region(soma_region)
-        # soma_region = opening_get_soma_region_gpu(soma_region)
+        # soma_region = opening_get_soma_region(soma_region)
+        soma_region = opening_get_soma_region_gpu(soma_region)
         soma_region = dusting(soma_region)
         # restore original size
         soma_region = restore_original_size(soma_region, original_shape, min_coords)
@@ -502,11 +502,8 @@ def get_soma_regions_file(file_name, tif_folder, soma_folder, muti_soma_marker_f
 
     if (os.path.exists(soma_region_path)):
         return
-    try:
-        soma_region = get_soma_region(tif_path, muti_soma_marker_path)
-    except:
-        print(f"error in {file_name}")
-        return
+
+    soma_region = get_soma_region(tif_path, muti_soma_marker_path)
     if (soma_region is None):
         return
     # binary
