@@ -139,14 +139,14 @@ class MemoryEfficientSoftDiceLoss(nn.Module):
 
         dc = self.calc_diceloss(x, y, axes, loss_mask)
         # print("fuck")
-        if(ptls_switch):
-            # time1 = time.time()
-            ptls = self.calc_npathloss(x, y, predecessor, axes, num_paths=50, soma=soma)
-            # print(f"time cost = {time.time() - time1}")
-            # print(f"dc, ptls, -dc+ptls: {-dc.detach().cpu().numpy(), ptls.detach().cpu().numpy(), -dc + ptls}")
-            return -dc, {"dc": -dc.detach().cpu().numpy(), "ptls": ptls.detach().cpu().numpy()}
+        # if(ptls_switch):
+        #     # time1 = time.time()
+        #     ptls = self.calc_npathloss(x, y, predecessor, axes, num_paths=50, soma=soma)
+        #     # print(f"time cost = {time.time() - time1}")
+        #     # print(f"dc, ptls, -dc+ptls: {-dc.detach().cpu().numpy(), ptls.detach().cpu().numpy(), -dc + ptls}")
+        #     return -dc, {"dc": -dc.detach().cpu().numpy(), "ptls": ptls.detach().cpu().numpy()}
 
-        return -dc, {"dc": -dc.detach().cpu().numpy()}
+        return -dc, {"dc": -dc.detach().cpu().numpy(), "ptls": 0}
 
 
 def get_tp_fp_fn_tn(net_output, gt, axes=None, mask=None, square=False):

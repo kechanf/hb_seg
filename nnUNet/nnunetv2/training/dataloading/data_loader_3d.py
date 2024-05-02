@@ -1,7 +1,20 @@
 import numpy as np
 from nnunetv2.training.dataloading.base_data_loader import nnUNetDataLoaderBase
 from nnunetv2.training.dataloading.nnunet_dataset import nnUNetDataset
+import cc3d
+import os
+import matplotlib.pyplot as plt
 
+def save_mip_image(image, filename='', temp_dir="/data/kfchen/nnUNet/temp_mip"):
+    if(filename == ''):
+        filename = str(np.random.randint(0, 100000)) + '.png'
+    mip = np.max(image, axis=0)
+    plt.imshow(mip, cmap='gray')
+    plt.axis('off')
+    plt.title('Maximum Intensity Projection')
+    plt.savefig(os.path.join(temp_dir, filename))
+    plt.close()
+    print(f"MIP图已保存为 {filename}")
 
 class nnUNetDataLoader3D(nnUNetDataLoaderBase):
     def generate_train_batch(self):
@@ -20,6 +33,10 @@ class nnUNetDataLoader3D(nnUNetDataLoaderBase):
             data, seg, properties = self._data.load_case(i)
             # print(f"data.shape, seg.shape {data.shape, seg.shape} in nnUNetDataLoader3D load_case")
             case_properties.append(properties)
+
+            # print(f"seg.shape: {seg.shape} in generate_train_batch")
+            # _, cc_num = cc3d.connected_components(seg[0].copy(), connectivity=26, return_N=True)
+            # print(f"cc_num: {cc_num} in generate_train_batch")
 
             # If we are doing the cascade then the segmentation from the previous stage will already have been loaded by
             # self._data.load_case(i) (see nnUNetDataset.load_case)
@@ -48,8 +65,19 @@ class nnUNetDataLoader3D(nnUNetDataLoaderBase):
             # print(f"padding: {padding}")
             padding = ((0, 0), *padding)
             data_all[j] = np.pad(data, padding, 'constant', constant_values=0)
-            seg_all[j] = np.pad(seg, padding, 'constant', constant_values=-1)
+            seg_all[j] = np.pad(seg, padding, 'constant', constant_values=0)
+            seg_all[j] = np.where(seg_all[j] > 0, 1, 0)
             # print(f"data_all[j].shape, seg_all[j].shape {data_all[j].shape, seg_all[j].shape} in nnUNetDataLoader3D")
+
+            # print(f"seg.shape: {seg.shape} in generate_train_batch")
+            _, cc_num = cc3d.connected_components(seg_all[j][0].copy(), connectivity=26, return_N=True)
+            if(cc_num>1):
+                print(f"cc_num: {cc_num} in generate_train_batch")
+                save_mip_image(seg_all[j][0])
+                data_all[j] = np.zeros_like(data_all[j])
+                seg_all[j] = np.zeros_like(seg_all[j])
+
+
 
         return {'data': data_all, 'seg': seg_all, 'properties': case_properties, 'keys': selected_keys}
 

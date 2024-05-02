@@ -64,7 +64,7 @@ elif (sys.platform == "linux"):
 # pred_path = r"D:\tracing_ws\nnUNet\nnUNet_results\150_test1223"
 # pred_path = r"E:\tracing_ws\10847\TEST10K7"
 data_source_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/Dataset102_human_brain_test500"
-result_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/result500_161_v13_e150"
+result_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/result500_164_250_ptls_500"
 
 trace_ws_path = r"/data/kfchen/trace_ws"
 # make dir for new result folder
@@ -190,23 +190,24 @@ def skel_tif_file(file_name, tif_folder, skel_folder):
 
 def skel_tif_folder(tif_folder, skel_folder):
     file_names = [f for f in os.listdir(tif_folder) if f.endswith('.tif')]
-    # partial_func = partial(skel_tif_file, tif_folder=tif_folder, skel_folder=skel_folder)
-    # with Pool(pool_num) as p:
-    #     for _ in tqdm(p.imap(partial_func, file_names),
-    #                   total=len(file_names), desc="skel_tif_folder", unit="file"):
-    #         pass
-    fp_ratio_list = []
-    for file_name in file_names:
-        tiff = tifffile.imread(os.path.join(tif_folder, file_name))
-        fp_ratio = np.sum(tiff) / 255
-        fp_ratio = fp_ratio / (tiff.shape[0] * tiff.shape[1] * tiff.shape[2])
-        fp_ratio_list.append(fp_ratio)
+    partial_func = partial(skel_tif_file, tif_folder=tif_folder, skel_folder=skel_folder)
+    with Pool(pool_num) as p:
+        for _ in tqdm(p.imap(partial_func, file_names),
+                      total=len(file_names), desc="skel_tif_folder", unit="file"):
+            pass
 
-    print(f"mean fp ratio: {np.mean(fp_ratio_list)}")
-    print(f"max fp ratio: {np.max(fp_ratio_list)}")
-    print(f"min fp ratio: {np.min(fp_ratio_list)}")
-
-    time.sleep(465456)
+    # fp_ratio_list = []
+    # for file_name in file_names:
+    #     tiff = tifffile.imread(os.path.join(tif_folder, file_name))
+    #     fp_ratio = np.sum(tiff) / 255
+    #     fp_ratio = fp_ratio / (tiff.shape[0] * tiff.shape[1] * tiff.shape[2])
+    #     fp_ratio_list.append(fp_ratio)
+    #
+    # print(f"mean fp ratio: {np.mean(fp_ratio_list)}")
+    # print(f"max fp ratio: {np.max(fp_ratio_list)}")
+    # print(f"min fp ratio: {np.min(fp_ratio_list)}")
+    #
+    # time.sleep(465456)
 
 
 
@@ -221,7 +222,7 @@ def dusting(img):
 
 
 def get_min_diameter_3d(binary_image):
-    labeled_array, num_features = label(binary_image)
+    labeled_array, num_features = scipy.ndimage.label(binary_image)
     largest_cc = np.argmax(np.bincount(labeled_array.flat)[1:]) + 1
     slice_x, slice_y, slice_z = find_objects(labeled_array == largest_cc)[0]
     diameter_x = slice_x.stop - slice_x.start
@@ -436,7 +437,7 @@ def get_soma_region(img_path, marker_path=None):
     if (sys.platform == "linux"):
         cmd_str = f'xvfb-run -a -s "-screen 0 640x480x16" {v3d_path} -x gsdt -f gsdt -i "{in_tmp}" -o "{out_tmp}" -p 0 1 0 1.5'
         cmd_str = process_path(cmd_str)
-        print(cmd_str)
+        # print(cmd_str)
         subprocess.run(cmd_str, stdout=subprocess.DEVNULL, shell=True)
     else:
         cmd = f'{v3d_path} /x gsdt /f gsdt /i "{in_tmp}" /o "{out_tmp}" /p 0 1 0 1.5'
@@ -469,8 +470,8 @@ def get_soma_region(img_path, marker_path=None):
         del pred, gsdt, max_gsdt
 
         soma_region, original_shape, min_coords = crop_nonzero(soma_region)
-        # soma_region = opening_get_soma_region(soma_region)
-        soma_region = opening_get_soma_region_gpu(soma_region)
+        soma_region = opening_get_soma_region(soma_region)
+        # soma_region = opening_get_soma_region_gpu(soma_region)
         soma_region = dusting(soma_region)
         # restore original size
         soma_region = restore_original_size(soma_region, original_shape, min_coords)
@@ -1219,13 +1220,13 @@ def compare_tif(folder1, folder2, out_folder):
 
 
 def prepossessing():
-    remove_others_in_folder(tif_folder_path)
-    rename_tif_folder(tif_folder_path)
-    uint8_tif_folder(tif_folder_path)
+    # remove_others_in_folder(tif_folder_path)
+    # rename_tif_folder(tif_folder_path)
+    # uint8_tif_folder(tif_folder_path)
     #
     # # ###########adf_folder(tif_folder_path, adf_folder_path)
     #
-    skel_tif_folder(tif_folder_path, skel_folder_path)
+    # skel_tif_folder(tif_folder_path, skel_folder_path)
     get_soma_regions_folder(tif_folder_path, soma_folder_path, muti_soma_marker_folder_path)
     get_skelwithsoma_folder(skel_folder_path, soma_folder_path, skelwithsoma_folder_path)
     get_somamarker_folder(soma_folder_path, somamarker_folder_path, muti_soma_marker_folder_path,
