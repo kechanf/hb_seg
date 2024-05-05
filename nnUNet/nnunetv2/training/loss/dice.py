@@ -1,3 +1,4 @@
+import random
 from typing import Callable
 
 import torch
@@ -141,7 +142,9 @@ class MemoryEfficientSoftDiceLoss(nn.Module):
         # print("fuck")
 
         ptls = self.calc_npathloss(x, y, predecessor, axes, num_paths=50, soma=soma)
-        return -dc+ptls, {"dc": -dc.detach().cpu().numpy(), "ptls": ptls.detach().cpu().numpy()}
+        if(random.randint(0, 99) == 0):
+            print("ptls off")
+        return -dc, {"dc": -dc.detach().cpu().numpy(), "ptls": ptls.detach().cpu().numpy()}
 
         # return -dc, {"dc": -dc.detach().cpu().numpy(), "ptls": 0}
 

@@ -1,3 +1,4 @@
+import math
 import time
 import numpy as np
 import os
@@ -65,3 +66,13 @@ class swcP_list:
     def __init__(self):
         self.p = []
         self.count = 0
+
+    def calc_p_to_soma(self, pn):
+        p = self.p[pn]
+        if p.p == -1 or p.p == p.n: # soma
+            return 0
+        else:
+            return calc_p_dist(p, self.p[p.p]) + self.calc_p_to_soma(p.p)
+
+def calc_p_dist(p1, p2):
+    return math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2 + (p1.z - p2.z) ** 2)

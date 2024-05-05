@@ -1,4 +1,6 @@
 import os
+import time
+
 from pylib import file_io
 import numpy as np
 from simple_swc_tool.soma_detection import simple_get_soma
@@ -15,6 +17,8 @@ import math
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import shutil
+from pylib import file_io
 
 def flip_and_resize_swc(img_path, swc_path, scale_factors, out_path=""):
     if (not out_path):
@@ -372,30 +376,40 @@ def gen_seg_mask(origin_swc_path, img_path, target_img_dir, target_swc_dir, targ
 
     img = tifffile.imread(img_path)
 
-    # 补齐
-    
-
-    scale_factors = [n / o for n, o in zip(patch_size, img.shape)]
-    if (not os.path.exists(target_img_path)):
-        img = scipy.ndimage.zoom(img, scale_factors, order=3)
-        tifffile.imwrite(target_img_path, img)
+    # scale_factors = [n / o for n, o in zip(patch_size, img.shape)]
+    # if (not os.path.exists(target_img_path)):
+    #     img = scipy.ndimage.zoom(img, scale_factors, order=3)
+    #     tifffile.imwrite(target_img_path, img)
+    shutil.copy(img_path, target_img_path)
+    scale_factors = (1, 1, 1)
 
     flip_path = flip_and_resize_swc(target_img_path, origin_swc_path, scale_factors, target_swc_path)
+    print("flip_and_resize_swc done")
     sort_path = sort_swc(target_img_path, flip_path)
+    print("sort_swc done")
 
     soma_region_path = simple_soma_region(target_img_path)
+    print("simple_soma_region done")
     #
     radius_path = calc_radius(target_img_path, sort_path)
+    print("calc_radius done")
     killed_soma_swc_path = kill_point_in_soma(radius_path, soma_region_path)
+    print("kill_point_in_soma done")
     #
     ano_path = swc2img(target_img_path, killed_soma_swc_path)
+    print("swc2img done")
     ano_path3 = or_img(ano_path, soma_region_path)
+    print("or_img done")
     #
     dilate_path = dilate_img(ano_path3)
+    print("dilate_img done")
     mask_path = and_img(target_img_path, dilate_path)
+    print("and_img done")
     #
     ano_path2 = swc2img(target_img_path, sort_path)
+    print("swc2img done")
     mask_path2 = or_img(mask_path, ano_path2)
+    print("or_img done")
     #
     dust_path = dust_img(mask_path2, 3, target_lab_path)
 
@@ -412,12 +426,19 @@ def gen_seg_mask(origin_swc_path, img_path, target_img_dir, target_swc_dir, targ
     if (os.path.exists(mask_path2)): os.remove(mask_path2)
 
 def process_file(tif_file, tif_source_dir, swc_source_dir, target_img_dir, target_swc_dir, target_lab_dir):
-    try:
-        tif_file_path = os.path.join(tif_source_dir, tif_file)
-        swc_file_path = os.path.join(swc_source_dir, tif_file[:-4] + ".swc")
-        gen_seg_mask(swc_file_path, tif_file_path, target_img_dir, target_swc_dir, target_lab_dir)
-    except:
-        print(f"tif_file {tif_file} failed")
+
+    tif_file_path = os.path.join(tif_source_dir, tif_file)
+    swc_file_path = os.path.join(swc_source_dir, tif_file[:-4] + ".swc")
+    if(not os.path.exists(swc_file_path)):
+        id = int(tif_file.split(".")[0].split("_")[0])
+        swc_files = os.listdir(swc_source_dir)
+        swc_files = [f for f in swc_files if f.endswith(".swc")]
+        for swc_file in swc_files:
+            if (id == int(swc_file.split(".")[0].split("_")[0])):
+                swc_file_path = os.path.join(swc_source_dir, swc_file)
+                break
+    gen_seg_mask(swc_file_path, tif_file_path, target_img_dir, target_swc_dir, target_lab_dir)
+
 
 def gen_mip(target_img_dir, target_lab_dir, target_mip_dir):
     tif_files = os.listdir(target_img_dir)
@@ -442,14 +463,48 @@ def gen_mip(target_img_dir, target_lab_dir, target_mip_dir):
         # save png
         plt.imsave(os.path.join(target_mip_dir, tif_file[:-4] + ".png"), mip_combined, cmap="gray")
 
-if __name__ == "__main__":
-    tif_source_dir = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/img/raw"
-    swc_source_dir = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/label/origin_swc"
 
-    target_img_dir = r"/data/kfchen/trace_ws/resized_dataset/img"
-    target_swc_dir = r"/data/kfchen/trace_ws/resized_dataset/swc"
-    target_lab_dir = r"/data/kfchen/trace_ws/resized_dataset/lab"
-    target_mip_dir = r"/data/kfchen/trace_ws/resized_dataset/mip"
+def get_sorted_files(directory, suffix='.v3draw'):
+    v3draw_files = []
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith(suffix) and "_i" not in file and "_p" not in file:
+                v3draw_files.append(os.path.join(root, file))
+
+    v3draw_files.sort()
+    return v3draw_files
+
+def copy_v3draw_to_tif(v3draw_dir=r"/PBshare/SEU-ALLEN/Projects/Human_Neurons/all_human_cells/all_human_cells_v3draw",
+                       gt_swc_dir="/data/kfchen/nnUNet/gt_swc",
+                       target_tif_dir="/data/kfchen/nnUNet/gt_tif_500"):
+    v3draw_images = get_sorted_files(v3draw_dir, suffix='.v3draw')
+    swc_files = get_sorted_files(gt_swc_dir, suffix='.swc')
+
+    v3draw_ids = [int(os.path.basename(f).split(".")[0].split('_')[0]) for f in v3draw_images]
+    swc_ids = [int(os.path.basename(f).split(".")[0].split('_')[0]) for f in swc_files]
+    shared_ids = list(set(v3draw_ids).intersection(set(swc_ids)))
+
+    v3draw_images = [f for f in v3draw_images if int(os.path.basename(f).split(".")[0].split('_')[0]) in shared_ids]
+
+    for v3draw_image in v3draw_images:
+        file_name = os.path.basename(v3draw_image).split(".")[0]
+        img = file_io.load_image(v3draw_image)[0]
+        print(img.shape)
+        tifffile.imwrite(os.path.join(target_tif_dir, file_name + ".tif"), img.astype(np.uint8))
+
+
+
+
+if __name__ == "__main__":
+    # tif_source_dir = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/img/raw"
+    # swc_source_dir = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/label/origin_swc"
+    tif_source_dir = "/data/kfchen/nnUNet/gt_tif_500"
+    swc_source_dir = "/data/kfchen/nnUNet/gt_swc"
+
+    target_img_dir = r"/data/kfchen/trace_ws/resized_dataset500/img"
+    target_swc_dir = r"/data/kfchen/trace_ws/resized_dataset500/swc"
+    target_lab_dir = r"/data/kfchen/trace_ws/resized_dataset500/lab"
+    target_mip_dir = r"/data/kfchen/trace_ws/resized_dataset500/mip"
     if (not os.path.exists(target_img_dir)): os.makedirs(target_img_dir)
     if (not os.path.exists(target_swc_dir)): os.makedirs(target_swc_dir)
     if (not os.path.exists(target_lab_dir)): os.makedirs(target_lab_dir)

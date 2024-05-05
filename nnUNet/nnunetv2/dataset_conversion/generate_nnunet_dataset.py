@@ -11,6 +11,11 @@ from tifffile import imread, imwrite
 import numpy as np
 from skimage.measure import block_reduce
 from pylib.file_io import load_image
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Thread
+from tqdm import tqdm
+from functools import partial
+from multiprocessing import Pool
 
 def delete_non_shared_files(img_folder, mask_folder):
     print(f"Deleting non-shared files in {img_folder} and {mask_folder}...")
@@ -337,8 +342,28 @@ def copy_gt_files(source_path, dest_path, mutisoma_marker_path, generate_muti_so
                 os.rename(os.path.join(dest_path, file_name), os.path.join(dest_path, file_name[:-5] + '.swc'))
 
 
+def cp_gt_seg_file(file_name, gt_seg_dir, target_dir, max_workers=12):
+    if (file_name.endswith('.tif')):
+        img = tifffile.imread(os.path.join(gt_seg_dir, file_name))
+        factor = 2
+        img = block_reduce(img, block_size=(factor, factor, factor), func=np.max)
+        img = img.astype("uint8")
+        tifffile.imwrite(os.path.join(target_dir, file_name), img.astype("uint8"))
 
 
+
+
+def cp_gt_seg(gt_seg_dir="/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/img/mask",
+              target_dir="/data/kfchen/trace_ws/gt_seg_downsample/tif"):
+    # 确保目标目录存在
+    os.makedirs(target_dir, exist_ok=True)
+
+    file_names = [f for f in os.listdir(gt_seg_dir) if f.endswith('.tif')]
+    partial_func = partial(cp_gt_seg_file, gt_seg_dir=gt_seg_dir, target_dir=target_dir)
+    with Pool(12) as p:
+        for _ in tqdm(p.imap(partial_func, file_names),
+                      total=len(file_names), desc="to_v3dswc_folder", unit="file"):
+            pass
 
 if __name__ == '__main__':
     nnUNet_raw = r"/data/kfchen/nnUNet/nnUNet_raw"
