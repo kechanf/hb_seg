@@ -64,7 +64,7 @@ elif (sys.platform == "linux"):
 # pred_path = r"D:\tracing_ws\nnUNet\nnUNet_results\150_test1223"
 # pred_path = r"E:\tracing_ws\10847\TEST10K7"
 data_source_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/Dataset102_human_brain_test500"
-result_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/result500_164_250_ptls_500"
+result_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/result500_164_500_aug_noptls"
 
 trace_ws_path = r"/data/kfchen/trace_ws"
 # make dir for new result folder
@@ -209,6 +209,21 @@ def skel_tif_folder(tif_folder, skel_folder):
     #
     # time.sleep(465456)
 
+def check_fp_ratio_folder(tif_folder):
+    file_names = [f for f in os.listdir(tif_folder) if f.endswith('.tif')]
+
+    fp_ratio_list = []
+    for file_name in file_names:
+        tiff = tifffile.imread(os.path.join(tif_folder, file_name))
+        fp_ratio = np.sum(tiff) / 255
+        fp_ratio = fp_ratio / (tiff.shape[0] * tiff.shape[1] * tiff.shape[2])
+        fp_ratio_list.append(fp_ratio)
+
+    print(f"mean fp ratio: {np.mean(fp_ratio_list)}")
+    print(f"max fp ratio: {np.max(fp_ratio_list)}")
+    print(f"min fp ratio: {np.min(fp_ratio_list)}")
+    #
+    # time.sleep(465456)
 
 
 
@@ -1096,7 +1111,7 @@ def connect_to_soma_file(file_name, swc_folder, soma_folder, conn_folder):
     #
     #     point_l.p[1].s.remove(s)
     #     point_l.p[s].pruned = True
-
+    # print(conn_path)
     write_swc(conn_path, point_l)
     del soma_region, point_l
 
@@ -1217,13 +1232,15 @@ def compare_tif(folder1, folder2, out_folder):
 
 
 def prepossessing():
-    # remove_others_in_folder(tif_folder_path)
-    # rename_tif_folder(tif_folder_path)
-    # uint8_tif_folder(tif_folder_path)
+    remove_others_in_folder(tif_folder_path)
+    rename_tif_folder(tif_folder_path)
+    uint8_tif_folder(tif_folder_path)
     #
     # # ###########adf_folder(tif_folder_path, adf_folder_path)
     #
-    # skel_tif_folder(tif_folder_path, skel_folder_path)
+    check_fp_ratio_folder(tif_folder_path)
+
+    skel_tif_folder(tif_folder_path, skel_folder_path)
     get_soma_regions_folder(tif_folder_path, soma_folder_path, muti_soma_marker_folder_path)
     get_skelwithsoma_folder(skel_folder_path, soma_folder_path, skelwithsoma_folder_path)
     get_somamarker_folder(soma_folder_path, somamarker_folder_path, muti_soma_marker_folder_path,

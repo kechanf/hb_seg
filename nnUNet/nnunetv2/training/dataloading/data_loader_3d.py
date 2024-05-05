@@ -69,13 +69,13 @@ class nnUNetDataLoader3D(nnUNetDataLoaderBase):
             seg_all[j] = np.where(seg_all[j] > 0, 1, 0)
             # print(f"data_all[j].shape, seg_all[j].shape {data_all[j].shape, seg_all[j].shape} in nnUNetDataLoader3D")
 
-            # print(f"seg.shape: {seg.shape} in generate_train_batch")
-            _, cc_num = cc3d.connected_components(seg_all[j][0].copy(), connectivity=26, return_N=True)
-            if(cc_num>1):
-                print(f"cc_num: {cc_num} in generate_train_batch")
-                save_mip_image(seg_all[j][0])
-                data_all[j] = np.zeros_like(data_all[j])
-                seg_all[j] = np.zeros_like(seg_all[j])
+            # # print(f"seg.shape: {seg.shape} in generate_train_batch")
+            # _, cc_num = cc3d.connected_components(seg_all[j][0].copy(), connectivity=26, return_N=True)
+            # if(cc_num>1):
+            #     print(f"cc_num: {cc_num} in generate_train_batch")
+            #     save_mip_image(seg_all[j][0])
+            #     data_all[j] = np.zeros_like(data_all[j])
+            #     seg_all[j] = np.zeros_like(seg_all[j])
 
 
 
