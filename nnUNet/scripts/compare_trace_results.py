@@ -202,7 +202,7 @@ def compare_l_measure():
 
     l_measure_gt_and_pred(gt_dir, pred_dir, gt_csv, pred_csv, violin_png, v3d_path=v3d_path)
 
-def compare_tip_to_soma(traced_dir1 = r"/data/kfchen/trace_ws/result500_164_500_aug_noptls/v3dswc",
+def compare_tip_to_soma(traced_dir1 = r"/data/kfchen/trace_ws/gt_seg_downsample/v3dswc",
                         traced_dir2 = r"/data/kfchen/trace_ws/result500_164_500_aug_ptls/v3dswc"):
     dir1_files = glob.glob(os.path.join(traced_dir1, '*swc'))
     dir2_files = glob.glob(os.path.join(traced_dir2, '*swc'))
