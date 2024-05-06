@@ -1136,7 +1136,10 @@ def to_v3dswc_file(file_name, swc_folder, v3dswc_folder):
     full_name = os.path.basename(swc_path).replace('.swc', '')
     # print(full_name)
     df = pd.read_csv(name_mapping_path)
-    img_size = df[df['full_name'] == full_name]['img_size'].values[0]
+    try:
+        img_size = df[df['full_name'] == full_name]['img_size'].values[0]
+    except:
+        img_size = df[df['full_name'].str.split('_').str[0] == full_name.split("_")[0]]['img_size'].values[0]
     # print(img_size)
     img_size = img_size.split(',')
 
@@ -1232,15 +1235,15 @@ def compare_tif(folder1, folder2, out_folder):
 
 
 def prepossessing():
-    remove_others_in_folder(tif_folder_path)
-    rename_tif_folder(tif_folder_path)
-    uint8_tif_folder(tif_folder_path)
+    # remove_others_in_folder(tif_folder_path)
+    # rename_tif_folder(tif_folder_path)
+    # uint8_tif_folder(tif_folder_path)
     #
     # # ###########adf_folder(tif_folder_path, adf_folder_path)
     #
-    check_fp_ratio_folder(tif_folder_path)
-
-    skel_tif_folder(tif_folder_path, skel_folder_path)
+    # check_fp_ratio_folder(tif_folder_path)
+    #
+    # skel_tif_folder(tif_folder_path, skel_folder_path)
     get_soma_regions_folder(tif_folder_path, soma_folder_path, muti_soma_marker_folder_path)
     get_skelwithsoma_folder(skel_folder_path, soma_folder_path, skelwithsoma_folder_path)
     get_somamarker_folder(soma_folder_path, somamarker_folder_path, muti_soma_marker_folder_path,
@@ -1309,10 +1312,10 @@ if __name__ == '__main__':
     # rename_muti_soma_markers(muti_soma_marker_folder_path)
 
     prepossessing()
-    # folder1 = r"E:\tracing_ws\10847\TEST10K7\tif"
-    # folder2 = r"E:\tracing_ws\10847\TEST10K1\tif"
-    # out_folder = r"E:\tracing_ws\10847\TEST10K7\compare"
-    # compare_tif(folder1, folder2, out_folder)
+    # # folder1 = r"E:\tracing_ws\10847\TEST10K7\tif"
+    # # folder2 = r"E:\tracing_ws\10847\TEST10K1\tif"
+    # # out_folder = r"E:\tracing_ws\10847\TEST10K7\compare"
+    # # compare_tif(folder1, folder2, out_folder)
     tracing()
     postprocessing()
 

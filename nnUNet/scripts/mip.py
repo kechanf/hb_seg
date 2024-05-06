@@ -11,7 +11,7 @@ import tifffile
 
 test_source = r"/PBshare/SEU-ALLEN/Projects/Human_Neurons/all_human_cells/all_human_cells_v3draw"
 
-dir_root = r"/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/10847_auto_v1.4_500_aug_noptls"
+dir_root = r"/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/10847_auto_v1.4_500_trace_gtseg"
 # dir_root = "/data/kfchen/10847"
 list_10847 = dir_root + r"/list_10847.xlsx"
 list_traced = dir_root + r"/list_traced.xlsx"
@@ -219,12 +219,14 @@ def get_mip_swc(swc_file, image, projection_direction='xy'):
 
 def find_swc(v3d_file, swc_root):
     swc_file = v3d_file.split('/')[-1].replace('.v3draw', '.swc')
+    id = swc_file.split('_')[0]
     # walk through all the files in the directory to find the swc file
-    for root, dirs, files in os.walk(swc_root):
-        if swc_file in files:
-            full_path = os.path.join(root, swc_file)
-            # print(full_path)
-            return full_path
+    for root, dirs, file_names in os.walk(swc_root):
+        for file_name in file_names:
+            if(id in file_name):
+                full_path = os.path.join(root, file_name)
+                # print(full_path)
+                return full_path
     return None
 
 
@@ -397,11 +399,11 @@ def compare_seg_mip_images(folder1, folder2, output_folder, max_workers=12):
 
 
 if __name__ == '__main__':
-    # main_mip()
+    main_mip()
     # concat_images()
-    compare_seg_mip_images("/data/kfchen/trace_ws/result500_164_500_aug_noptls/tif",
-                           "/data/kfchen/trace_ws/result500_164_500_aug_ptls/tif",
-                           "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/compare_seg_mip_<v1.4_164_500_aug_noptls>_vs_<v1.4_164_500_aug_ptls>")
+    # compare_seg_mip_images("/data/kfchen/trace_ws/result500_164_500_aug_noptls/tif",
+    #                        "/data/kfchen/trace_ws/result500_164_500_aug_ptls/tif",
+    #                        "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/compare_seg_mip_<v1.4_164_500_aug_noptls>_vs_<v1.4_164_500_aug_ptls>")
 
 
 

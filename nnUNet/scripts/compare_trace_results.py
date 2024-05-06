@@ -87,7 +87,7 @@ def plot_violin(df_gt, df_pred, violin_png):
     axes = axes.flatten()
 
     df_gt['Type'] = 'gt'  # "GT"
-    df_pred['Type'] = 'aug_ptls'  # "Pred"
+    df_pred['Type'] = 'trace_gtseg'  # "Pred"
 
     df = pd.concat([df_gt, df_pred], axis=0)
     df_long = pd.melt(df, id_vars=['Type'], value_vars=feature_name, var_name='Feature', value_name='Value')
@@ -186,7 +186,7 @@ def compare_l_measure():
     gt_dir = r"/data/kfchen/nnUNet/gt_swc"
     # pred_dir = r"/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/10847_auto_v1.4_12k/swc"
     # gt_dir = (r"/data/kfchen/trace_ws/result500_164_500_aug_noptls/v3dswc")
-    pred_dir = r"/data/kfchen/trace_ws/result500_164_500_aug_ptls/v3dswc"
+    pred_dir = r"/data/kfchen/trace_ws/gt_seg_downsample/v3dswc"
 
     gt_csv = r"/data/kfchen/nnUNet/gt_swc.csv"
     pred_csv = r"/data/kfchen/nnUNet/pred_swc.csv"
@@ -263,6 +263,7 @@ def compare_tip_to_soma(traced_dir1 = r"/data/kfchen/trace_ws/gt_seg_downsample/
 
 
 if __name__ == '__main__':
+    # compare_l_measure()
     compare_tip_to_soma()
     pass
 
