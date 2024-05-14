@@ -11,7 +11,7 @@ import tifffile
 
 test_source = r"/PBshare/SEU-ALLEN/Projects/Human_Neurons/all_human_cells/all_human_cells_v3draw"
 
-dir_root = r"/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/10847_auto_v1.4_500_trace_gtseg"
+dir_root = r"/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/10847_auto_v1.4_e1000+250_ptls"
 # dir_root = "/data/kfchen/10847"
 list_10847 = dir_root + r"/list_10847.xlsx"
 list_traced = dir_root + r"/list_traced.xlsx"
@@ -259,11 +259,11 @@ def concat_image_file(filename, folder_path, concat_folder, dir_list):
 def concat_images(max_workers=12):
     folder_path_prefix = r"/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/10847_auto_"
     # dir_list = ["v1.0", "v1.1", "v1.2", "v1.3"]
-    dir_list = ["v1.4_500_origin", "v1.4_500_ptls"]
+    dir_list = ["v1.4_e1000+250_noptls", "v1.4_e1000+250_ptls"]
     folder_path = [folder_path_prefix + dir + "/mip_swc" for dir in dir_list]
 
     # 新文件夹路径
-    concat_folder = r"/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/concat_mip_ptls"
+    concat_folder = r"/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/concat_mip_ptls_e1000"
     os.makedirs(concat_folder, exist_ok=True)
 
     file_list = []
@@ -399,11 +399,11 @@ def compare_seg_mip_images(folder1, folder2, output_folder, max_workers=12):
 
 
 if __name__ == '__main__':
-    main_mip()
-    # concat_images()
-    # compare_seg_mip_images("/data/kfchen/trace_ws/result500_164_500_aug_noptls/tif",
-    #                        "/data/kfchen/trace_ws/result500_164_500_aug_ptls/tif",
-    #                        "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/compare_seg_mip_<v1.4_164_500_aug_noptls>_vs_<v1.4_164_500_aug_ptls>")
+    # main_mip()
+    concat_images()
+    # compare_seg_mip_images("/data/kfchen/trace_ws/result500_e1000+250_noptls/tif",
+    #                        "/data/kfchen/trace_ws/result500_e1000+250_ptls/tif",
+    #                        "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/compare_seg_mip_<v1.4_result500_e1000+250_noptls>_vs_<v1.4_/result500_e1000+250_ptls>")
 
 
 

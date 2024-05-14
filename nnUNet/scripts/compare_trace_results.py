@@ -86,8 +86,8 @@ def plot_violin(df_gt, df_pred, violin_png):
     fig, axes = plt.subplots(rows, cols, figsize=(5 * cols, 5 * rows), sharey=False)
     axes = axes.flatten()
 
-    df_gt['Type'] = 'gt'  # "GT"
-    df_pred['Type'] = 'trace_gtseg'  # "Pred"
+    df_gt['Type'] = 'noptls'  # "GT"
+    df_pred['Type'] = 'ptls'  # "Pred"
 
     df = pd.concat([df_gt, df_pred], axis=0)
     df_long = pd.melt(df, id_vars=['Type'], value_vars=feature_name, var_name='Feature', value_name='Value')
@@ -183,10 +183,10 @@ def l_measure_gt_and_pred(gt_dir, pred_dir, gt_csv, pred_csv, violin_png,
     plot_violin(df_gt, df_pred, violin_png)
 
 def compare_l_measure():
-    gt_dir = r"/data/kfchen/nnUNet/gt_swc"
+    gt_dir = r"/data/kfchen/trace_ws/result500_e1000+250_noptls_lr1e-5/v3dswc"
     # pred_dir = r"/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/10847_auto_v1.4_12k/swc"
     # gt_dir = (r"/data/kfchen/trace_ws/result500_164_500_aug_noptls/v3dswc")
-    pred_dir = r"/data/kfchen/trace_ws/gt_seg_downsample/v3dswc"
+    pred_dir = r"/data/kfchen/trace_ws/result500_e1000+250_ptls_lr1e-5/v3dswc"
 
     gt_csv = r"/data/kfchen/nnUNet/gt_swc.csv"
     pred_csv = r"/data/kfchen/nnUNet/pred_swc.csv"
@@ -202,8 +202,8 @@ def compare_l_measure():
 
     l_measure_gt_and_pred(gt_dir, pred_dir, gt_csv, pred_csv, violin_png, v3d_path=v3d_path)
 
-def compare_tip_to_soma(traced_dir1 = r"/data/kfchen/trace_ws/gt_seg_downsample/v3dswc",
-                        traced_dir2 = r"/data/kfchen/trace_ws/result500_164_500_aug_ptls/v3dswc"):
+def compare_tip_to_soma(traced_dir1 = r"/data/kfchen/trace_ws/result500_e1000/v3dswc",
+                        traced_dir2 = r"/data/kfchen/trace_ws/result500_e1000+250_ptls/v3dswc"):
     dir1_files = glob.glob(os.path.join(traced_dir1, '*swc'))
     dir2_files = glob.glob(os.path.join(traced_dir2, '*swc'))
     dir1_files.sort()
@@ -263,7 +263,7 @@ def compare_tip_to_soma(traced_dir1 = r"/data/kfchen/trace_ws/gt_seg_downsample/
 
 
 if __name__ == '__main__':
-    # compare_l_measure()
-    compare_tip_to_soma()
+    compare_l_measure()
+    # compare_tip_to_soma()
     pass
 

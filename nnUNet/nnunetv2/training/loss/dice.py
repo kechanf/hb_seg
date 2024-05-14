@@ -142,11 +142,13 @@ class MemoryEfficientSoftDiceLoss(nn.Module):
         # print("fuck")
 
         ptls = self.calc_npathloss(x, y, predecessor, axes, num_paths=50, soma=soma)
-        if(random.randint(0, 99) == 0):
-            print("ptls off")
-        return -dc, {"dc": -dc.detach().cpu().numpy(), "ptls": ptls.detach().cpu().numpy()}
+        # if(random.randint(0, 99) == 0):
+        #     print("ptls off")
+        # return -dc, {"dice": -dc.detach().cpu().numpy(), "ptls": ptls.detach().cpu().numpy()}
 
-        # return -dc, {"dc": -dc.detach().cpu().numpy(), "ptls": 0}
+        if (random.randint(0, 99) == 0):
+            print("ptls on")
+        return -dc + ptls, {"dice": -dc.detach().cpu().numpy(), "ptls": ptls.detach().cpu().numpy()}
 
 
 def get_tp_fp_fn_tn(net_output, gt, axes=None, mask=None, square=False):
