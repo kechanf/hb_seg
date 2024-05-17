@@ -19,6 +19,8 @@ from typing import Tuple, Union
 import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import *
 from tqdm import tqdm
+import tifffile
+import cc3d
 
 import nnunetv2
 from nnunetv2.paths import nnUNet_preprocessed, nnUNet_raw
@@ -48,7 +50,7 @@ class DefaultPreprocessor(object):
 
         has_seg = seg is not None
 
-        # apply transpose_forward, this also needs to be applied to the spacing!
+        # apply transpose_forward, this  also needs to be applied to the spacing!
         data = data.transpose([0, *[i + 1 for i in plans_manager.transpose_forward]])
         if seg is not None:
             seg = seg.transpose([0, *[i + 1 for i in plans_manager.transpose_forward]])
@@ -110,7 +112,113 @@ class DefaultPreprocessor(object):
             seg = seg.astype(np.int16)
         else:
             seg = seg.astype(np.int8)
+
+        # num_cc = np.max(cc3d.connected_components(seg[0], connectivity=26))
+        # print(f"{num_cc} in tag 3")
+
         return data, seg
+
+    def count_connected_components_in_tif_files(self, directory_path):  # 确定所有TIF文件中的连通块数量
+        # 遍历文件夹中的所有文件
+        for filename in os.listdir(directory_path):
+            if filename.endswith('.tif'):
+                file_path = os.path.join(directory_path, filename)
+
+                # 读取TIF文件
+                image = tifffile.imread(file_path)
+
+                # 确保图像是3D
+                if image.ndim == 3:
+                    # 计算连通块数量，使用26邻域
+                    labels_out = cc3d.connected_components(image, connectivity=26)
+                    num_connected_components = np.max(labels_out)
+
+                    if (not num_connected_components == 1):
+                        print(f"{filename} contains {num_connected_components} connected components.")
+                else:
+                    print(f"{filename} is not a 3D image.")
+
+    def get_largest_connected_component(self, seg):
+        """
+        Get the largest connected component from the segmentation label.
+
+        Args:
+            seg (numpy.ndarray): The 3D segmentation label array.
+
+        Returns:
+            largest_component (numpy.ndarray): The segmentation label with only the largest connected component.
+        """
+        labels_out = cc3d.connected_components(seg, connectivity=26)
+        unique, counts = np.unique(labels_out, return_counts=True)
+
+        # Remove background (label 0)
+        counts[0] = 0
+
+        largest_label = unique[np.argmax(counts)]
+
+        largest_component = (labels_out == largest_label).astype(seg.dtype)
+
+        if (not np.max(labels_out) == 1):
+            print("fuck")
+            print(f"cc_num, {np.max(labels_out)}, ratio: {np.sum(largest_component) / np.sum(seg)}")
+
+        return largest_component
+
+    def crop_and_pad(self, image, seg, patch_size):
+        """
+        Crop the region around the segmentation label and pad or crop to a given patch size.
+
+        Args:
+            image (numpy.ndarray): The 3D image array.
+            seg (numpy.ndarray): The 3D segmentation label array.
+            patch_size (tuple): The target patch size (z, y, x).
+
+        Returns:
+            cropped_image (numpy.ndarray): The cropped and padded or cropped image.
+            cropped_seg (numpy.ndarray): The cropped and padded or cropped segmentation label.
+        """
+        assert image.shape == seg.shape, "Image and segmentation label must have the same shape."
+
+        # Get the bounding box of the non-zero region in the segmentation label
+        non_zero_coords = np.argwhere(seg)
+        min_coords = non_zero_coords.min(axis=0)
+        max_coords = non_zero_coords.max(axis=0) + 1  # add 1 to include the max coordinate
+
+        # Crop the image and segmentation label
+        cropped_image = image[min_coords[0]:max_coords[0], min_coords[1]:max_coords[1], min_coords[2]:max_coords[2]]
+        cropped_seg = seg[min_coords[0]:max_coords[0], min_coords[1]:max_coords[1], min_coords[2]:max_coords[2]]
+
+        # Calculate the dimensions after cropping
+        cropped_shape = cropped_image.shape
+
+        # Initialize padded shape
+        padded_image = np.zeros(patch_size, dtype=image.dtype)
+        padded_seg = np.zeros(patch_size, dtype=seg.dtype)
+
+        # Calculate the start indices for padding or cropping to center the content
+
+        start_idx = [(patch_size[i] - cropped_shape[i]) // 2 if cropped_shape[i] < patch_size[i] else 0 for i in
+                     range(3)]
+        end_idx = [start_idx[i] + min(cropped_shape[i], patch_size[i]) for i in range(3)]
+
+
+
+        # Calculate the slices for cropped image and segmentation
+        crop_slices = [slice(max(0, (cropped_shape[i] - patch_size[i]) // 2),
+                             max(0, (cropped_shape[i] - patch_size[i]) // 2) + min(cropped_shape[i], patch_size[i]))
+                       for i in range(3)]
+
+        # Insert the cropped content into the padded arrays
+        padded_image[start_idx[0]:end_idx[0], start_idx[1]:end_idx[1], start_idx[2]:end_idx[2]] = cropped_image[
+            crop_slices[0], crop_slices[1], crop_slices[2]]
+        padded_seg[start_idx[0]:end_idx[0], start_idx[1]:end_idx[1], start_idx[2]:end_idx[2]] = cropped_seg[
+            crop_slices[0], crop_slices[1], crop_slices[2]]
+
+        padded_seg = self.get_largest_connected_component(padded_seg)
+
+        return np.array([padded_image]), np.array([padded_seg])
+
+
 
     def run_case(self, image_files: List[str], seg_file: Union[str, None], plans_manager: PlansManager,
                  configuration_manager: ConfigurationManager,
@@ -135,9 +243,17 @@ class DefaultPreprocessor(object):
             seg, _ = rw.read_seg(seg_file)
         else:
             seg = None
+        data, seg = self.crop_and_pad(data[0], seg[0], (80, 256, 256))
 
+        # print(f"shape before preprocessing: {data.shape}, {seg.shape if seg is not None else None}")
         data, seg = self.run_case_npy(data, seg, data_properties, plans_manager, configuration_manager,
                                       dataset_json)
+
+        num_connected_components = np.max(cc3d.connected_components(seg[0], connectivity=26))
+        if(not num_connected_components == 1):
+            print(f"Number of connected components: {num_connected_components}, seg shape: {seg[0].shape}, "
+              f"data shape: {data[0].shape}")
+
         return data, seg, data_properties
 
     def run_case_save(self, output_filename_truncated: str, image_files: List[str], seg_file: str,

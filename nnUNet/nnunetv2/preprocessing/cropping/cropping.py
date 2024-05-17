@@ -33,11 +33,12 @@ def crop_to_nonzero(data, seg=None, nonzero_label=-1):
     
     slicer = (slice(None), ) + slicer
     data = data[slicer]
-    if seg is not None:
-        seg = seg[slicer]
-        seg[(seg == 0) & (~nonzero_mask)] = nonzero_label
-    else:
-        seg = np.where(nonzero_mask, np.int8(0), np.int8(nonzero_label))
+    seg = seg[slicer]
+    # if seg is not None:
+    #     seg = seg[slicer]
+    #     seg[(seg == 0) & (~nonzero_mask)] = nonzero_label
+    # else:
+    #     seg = np.where(nonzero_mask, np.int8(0), np.int8(nonzero_label))
     return data, seg, bbox
 
 

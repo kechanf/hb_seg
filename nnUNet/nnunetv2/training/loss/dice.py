@@ -7,6 +7,7 @@ from torch import nn
 import numpy as np
 from nnunetv2.training.loss.npathloss import npathloss
 import time
+import cc3d
 
 
 class SoftDiceLoss(nn.Module):
@@ -130,6 +131,12 @@ class MemoryEfficientSoftDiceLoss(nn.Module):
         return pathloss
 
     def forward(self, x, y, loss_mask=None, predecessor=None, soma=None, ptls_switch=True):
+        print(y.shape)
+        # for batch in range(y.shape[0]):
+        #     for channel in range(y.shape[1]):
+        #         cc_num = np.max(cc3d.connected_components(y[batch, channel].detach().cpu().numpy(), connectivity=26))
+        #         if(cc_num > 1):
+        #             print(f"shape of y: {y.shape}, cc_num: {cc_num}")
         # print(len(x), len(y))
         # print(f"x.shape, y.shape: {x.shape}, {y.shape} in MemoryEfficientSoftDiceLoss.forward()")
         if self.apply_nonlin is not None:
@@ -142,13 +149,13 @@ class MemoryEfficientSoftDiceLoss(nn.Module):
         # print("fuck")
 
         ptls = self.calc_npathloss(x, y, predecessor, axes, num_paths=50, soma=soma)
-        # if(random.randint(0, 99) == 0):
-        #     print("ptls off")
-        # return -dc, {"dice": -dc.detach().cpu().numpy(), "ptls": ptls.detach().cpu().numpy()}
+        if(random.randint(0, 99) == 0):
+            print("ptls off")
+        return -dc, {"dice": -dc.detach().cpu().numpy(), "ptls": ptls.detach().cpu().numpy()}
 
-        if (random.randint(0, 99) == 0):
-            print("ptls on")
-        return -dc + ptls, {"dice": -dc.detach().cpu().numpy(), "ptls": ptls.detach().cpu().numpy()}
+        # if (random.randint(0, 99) == 0):
+        #     print("ptls on")
+        # return -dc + ptls, {"dice": -dc.detach().cpu().numpy(), "ptls": ptls.detach().cpu().numpy()}
 
 
 def get_tp_fp_fn_tn(net_output, gt, axes=None, mask=None, square=False):

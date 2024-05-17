@@ -11,7 +11,7 @@ import tifffile
 
 test_source = r"/PBshare/SEU-ALLEN/Projects/Human_Neurons/all_human_cells/all_human_cells_v3draw"
 
-dir_root = r"/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/10847_auto_v1.4_e1000+250_ptls"
+dir_root = r"/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/10847_auto_v1.4_12697_add"
 # dir_root = "/data/kfchen/10847"
 list_10847 = dir_root + r"/list_10847.xlsx"
 list_traced = dir_root + r"/list_traced.xlsx"
@@ -399,8 +399,8 @@ def compare_seg_mip_images(folder1, folder2, output_folder, max_workers=12):
 
 
 if __name__ == '__main__':
-    # main_mip()
-    concat_images()
+    main_mip()
+    # concat_images()
     # compare_seg_mip_images("/data/kfchen/trace_ws/result500_e1000+250_noptls/tif",
     #                        "/data/kfchen/trace_ws/result500_e1000+250_ptls/tif",
     #                        "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/compare_seg_mip_<v1.4_result500_e1000+250_noptls>_vs_<v1.4_/result500_e1000+250_ptls>")

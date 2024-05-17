@@ -16,6 +16,7 @@ from threading import Thread
 from tqdm import tqdm
 from functools import partial
 from multiprocessing import Pool
+import cc3d
 
 def delete_non_shared_files(img_folder, mask_folder):
     print(f"Deleting non-shared files in {img_folder} and {mask_folder}...")
@@ -230,7 +231,7 @@ def generate_train_data(images_dir, seg_dir, imagestr, labelstr,
         '.tif'
     )
 
-def generate_test_data(test_source, imagests, raw_info_path, mutisoma_marker_path, csv_path, generate_muti_soma=0, debug=True):
+def generate_test_data(test_source, imagests, raw_info_path, mutisoma_marker_path, csv_path, generate_muti_soma=0, debug=False):
     data = {
         'ID': [],
         'full_name': [],
@@ -242,10 +243,13 @@ def generate_test_data(test_source, imagests, raw_info_path, mutisoma_marker_pat
 
     images = get_sorted_files(test_source, suffix='.v3draw')
     ids = [int(im.split('/')[-1].split('_')[0]) for im in images]
-    gt_files = get_sorted_files("/data/kfchen/nnUNet/gt_swc", suffix='.swc')
-    gt_ids = [int(im.split('/')[-1].split('_')[0]) for im in gt_files]
-    shared_ids = list(set(ids).intersection(set(gt_ids)))
-    images = [im for im in images if int(im.split('/')[-1].split('_')[0]) in shared_ids]
+    # gt_files = get_sorted_files("/data/kfchen/nnUNet/gt_swc", suffix='.swc')
+    # gt_ids = [int(im.split('/')[-1].split('_')[0]) for im in gt_files]
+    # shared_ids = list(set(ids).intersection(set(gt_ids)))
+    # images = [im for im in images if int(im.split('/')[-1].split('_')[0]) in shared_ids]
+    # print(len(images))
+
+
 
     if(debug):
         images = images[:10]
@@ -254,6 +258,8 @@ def generate_test_data(test_source, imagests, raw_info_path, mutisoma_marker_pat
     progress_bar = tqdm(total=len(images), desc="Copying img", unit="file")
     for im, id in zip(images, ids):
         progress_bar.update(1)
+        if(id < 12697):
+            continue
         target_name = f'image_{(id):03d}'
 
         file_name = im.split('/')[-1]
@@ -365,14 +371,72 @@ def cp_gt_seg(gt_seg_dir="/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/img/m
                       total=len(file_names), desc="to_v3dswc_folder", unit="file"):
             pass
 
+
+def update_spacing_in_json_files(directory_path):
+    # 遍历文件夹中的所有文件
+    processed_num = 0
+    for filename in os.listdir(directory_path):
+        if filename.endswith('.json'):
+            file_path = os.path.join(directory_path, filename)
+
+            # 读取JSON文件
+            with open(file_path, 'r', encoding='utf-8') as file:
+                data = json.load(file)
+
+            # 修改spacing项
+            if 'spacing' in data:
+                data['spacing'] = (1, 1, 1)
+
+            # 将修改后的内容写回JSON文件
+            with open(file_path, 'w', encoding='utf-8') as file:
+                json.dump(data, file, ensure_ascii=False, indent=4)
+
+            print(f"Updated spacing in {filename}")
+            processed_num += 1
+    print(f"Processed {processed_num} files. there are {len(os.listdir(directory_path))} files in total.")
+
+
+def count_connected_components_in_tif_files(directory_path): # 确定所有TIF文件中的连通块数量
+    max_z = 0
+    min_z = 100
+    mean_z = 0
+    # 遍历文件夹中的所有文件
+    for filename in os.listdir(directory_path):
+        if filename.endswith('.tif'):
+            file_path = os.path.join(directory_path, filename)
+
+            # 读取TIF文件
+            image = tifffile.imread(file_path)
+
+            max_z = max(max_z, image.shape[0])
+            min_z = min(min_z, image.shape[0])
+            mean_z += image.shape[0]
+
+            # 确保图像是3D
+            if image.ndim == 3:
+                # 计算连通块数量，使用26邻域
+                labels_out = cc3d.connected_components(image, connectivity=26)
+                num_connected_components = np.max(labels_out)
+
+                if(not num_connected_components == 1):
+                    print(f"{filename} contains {num_connected_components} connected components.")
+            else:
+                print(f"{filename} is not a 3D image.")
+    print(f"max_z: {max_z}, min_z: {min_z}, mean_z: {mean_z / len(os.listdir(directory_path)) * 2}")
+
 if __name__ == '__main__':
+    directory_path = '/data/kfchen/nnUNet/nnUNet_preprocessed/Dataset167_human_brain_10000_noptls/gt_segmentations'
+    count_connected_components_in_tif_files(directory_path)
+    print("done")
+    time.sleep(123132)
+
     nnUNet_raw = r"/data/kfchen/nnUNet/nnUNet_raw"
     raw_info_path = "/home/kfchen/dataset/img/raw_info.xlsx"
     mutisoma_marker_path = r"/data/kfchen/nnUNet/nnUNet_raw/muti_soma_markers"
     label_info_path = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/label/label_info.xlsx"
 
     # dataset_name = 'Dataset101_human_brain_10000_ssoma_test'
-    dataset_name = 'Dataset163_human_brain_resized_10k_source'
+    dataset_name = 'Dataset103_human_brain_12497_add'
     # images_dir = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/image"
     # seg_dir = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/label"
     images_dir = "/data/kfchen/trace_ws/resized_dataset/img"
@@ -391,8 +455,8 @@ if __name__ == '__main__':
         os.makedirs(imagests)
 
     label_info = pd.read_excel(label_info_path)
-    generate_train_data(images_dir, seg_dir, imagestr, labelstr, mutisoma_marker_path, label_info, csv_path, generate_muti_soma=0, debug=False)
-    # generate_test_data(test_source, imagests, raw_info_path, mutisoma_marker_path, csv_path, debug=False)
+    # generate_train_data(images_dir, seg_dir, imagestr, labelstr, mutisoma_marker_path, label_info, csv_path, generate_muti_soma=0, debug=False)
+    generate_test_data(test_source, imagests, raw_info_path, mutisoma_marker_path, csv_path)
     # copy_gt_files(gt_path, r"/data/kfchen/nnUNet/gt_swc", mutisoma_marker_path, generate_muti_soma=0, debug=False)
 
     # nnUNetv2_plan_and_preprocess -d DATASET_ID --verify_dataset_integrity

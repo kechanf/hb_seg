@@ -149,7 +149,7 @@ class nnUNetTrainer(object):
         self.oversample_foreground_percent = 0.33
         self.num_iterations_per_epoch = 250
         self.num_val_iterations_per_epoch = 50
-        self.num_epochs = 1000 + 250
+        self.num_epochs = 250 + 250
         self.current_epoch = 0
         self.enable_deep_supervision = False
 
@@ -697,7 +697,7 @@ class nnUNetTrainer(object):
     ) -> AbstractTransform:
         tr_transforms = []
 
-        # tr_transforms.append(SimpleTransform(patch_size))
+        tr_transforms.append(SimpleTransform(patch_size))
 
         if do_dummy_2d_data_aug:
             ignore_axes = (0,)
@@ -735,7 +735,7 @@ class nnUNetTrainer(object):
 
         tr_transforms.append(RenameTransform('seg', 'target', True))
 
-        # tr_transforms.append(TestTransform(patch_size))
+        tr_transforms.append(TestTransform(patch_size))
 
         if(get_predecessor_from_target):
             tr_transforms.append(AddPredecessorImageTransform('predecessor', 'target', 'soma'))
