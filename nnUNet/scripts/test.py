@@ -64,8 +64,8 @@ elif (sys.platform == "linux"):
 # pred_folder_path = os.path.join(pred_path, "3d_cascade_fullres")
 # pred_path = r"D:\tracing_ws\nnUNet\nnUNet_results\150_test1223"
 # pred_path = r"E:\tracing_ws\10847\TEST10K7"
-data_source_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/Dataset102_human_brain_test500"
-result_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/result500_newpre_source"
+data_source_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/Dataset105_human_brain_ou"
+result_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/result_ou"
 
 trace_ws_path = r"/data/kfchen/trace_ws"
 # make dir for new result folder
@@ -518,8 +518,10 @@ def get_soma_regions_file(file_name, tif_folder, soma_folder, muti_soma_marker_f
 
     if (os.path.exists(soma_region_path)):
         return
-
-    soma_region = get_soma_region(tif_path, muti_soma_marker_path)
+    try:
+        soma_region = get_soma_region(tif_path, muti_soma_marker_path)
+    except:
+        return
     if (soma_region is None):
         return
     # binary
@@ -1239,9 +1241,9 @@ def prepossessing():
     remove_others_in_folder(tif_folder_path)
     rename_tif_folder(tif_folder_path)
     uint8_tif_folder(tif_folder_path)
-    #
-    # # ###########adf_folder(tif_folder_path, adf_folder_path)
-    #
+    # #
+    # # # ###########adf_folder(tif_folder_path, adf_folder_path)
+    # #
     check_fp_ratio_folder(tif_folder_path)
     # time.sleep(100000)
     #
