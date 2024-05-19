@@ -131,7 +131,7 @@ class MemoryEfficientSoftDiceLoss(nn.Module):
         return pathloss
 
     def forward(self, x, y, loss_mask=None, predecessor=None, soma=None, ptls_switch=True):
-        print(y.shape)
+        # print(y.shape)
         # for batch in range(y.shape[0]):
         #     for channel in range(y.shape[1]):
         #         cc_num = np.max(cc3d.connected_components(y[batch, channel].detach().cpu().numpy(), connectivity=26))
@@ -148,14 +148,14 @@ class MemoryEfficientSoftDiceLoss(nn.Module):
         dc = self.calc_diceloss(x, y, axes, loss_mask)
         # print("fuck")
 
-        ptls = self.calc_npathloss(x, y, predecessor, axes, num_paths=50, soma=soma)
-        if(random.randint(0, 99) == 0):
-            print("ptls off")
-        return -dc, {"dice": -dc.detach().cpu().numpy(), "ptls": ptls.detach().cpu().numpy()}
+        ptls = self.calc_npathloss(x, y, predecessor, axes, num_paths=50, soma=soma) * 0.1
+        # if(random.randint(0, 99) == 0):
+        #     print("ptls off")
+        # return -dc, {"dice": -dc.detach().cpu().numpy(), "ptls": ptls.detach().cpu().numpy()}
 
-        # if (random.randint(0, 99) == 0):
-        #     print("ptls on")
-        # return -dc + ptls, {"dice": -dc.detach().cpu().numpy(), "ptls": ptls.detach().cpu().numpy()}
+        if (random.randint(0, 99) == 0):
+            print("ptls on")
+        return -dc + ptls, {"dice": -dc.detach().cpu().numpy(), "ptls": ptls.detach().cpu().numpy()}
 
 
 def get_tp_fp_fn_tn(net_output, gt, axes=None, mask=None, square=False):

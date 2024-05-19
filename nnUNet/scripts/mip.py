@@ -350,7 +350,9 @@ def calculate_mip(image_path):
 def compare_seg_mip_image_file(filename, folder1, folder2, output_folder):
     """处理单个图像文件并保存对比图。"""
     img_path1 = os.path.join(folder1, filename)
-    img_path2 = os.path.join(folder2, filename)
+    id = int(filename.split('.')[0].split('_')[0])
+    filename2 = [file for file in os.listdir(folder2) if id == int(file[:5])][0]
+    img_path2 = os.path.join(folder2, filename2)
 
     # 计算每个文件的MIP
     mip1 = calculate_mip(img_path1)
@@ -383,9 +385,12 @@ def compare_seg_mip_images(folder1, folder2, output_folder, max_workers=12):
     # 获取两个文件夹中的图像文件名
     files1 = {file for file in os.listdir(folder1) if file.endswith('.tif')}
     files2 = {file for file in os.listdir(folder2) if file.endswith('.tif')}
+    id1 = [int(file.split('.')[0].split('_')[0]) for file in files1]
+    id2 = [int(file.split('.')[0].split('_')[0]) for file in files2]
+    files1 = {file for file in files1 if int(file.split('.')[0].split('_')[0]) in id2}
+    files2 = {file for file in files2 if int(file.split('.')[0].split('_')[0]) in id1}
 
-    # 找出两个文件夹中都存在的文件
-    common_files = list(files1.intersection(files2))
+    common_files = files1
 
     # 确保输出文件夹存在
     os.makedirs(output_folder, exist_ok=True)
@@ -399,11 +404,11 @@ def compare_seg_mip_images(folder1, folder2, output_folder, max_workers=12):
 
 
 if __name__ == '__main__':
-    main_mip()
+    # main_mip()
     # concat_images()
-    # compare_seg_mip_images("/data/kfchen/trace_ws/result500_e1000+250_noptls/tif",
-    #                        "/data/kfchen/trace_ws/result500_e1000+250_ptls/tif",
-    #                        "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/compare_seg_mip_<v1.4_result500_e1000+250_noptls>_vs_<v1.4_/result500_e1000+250_ptls>")
+    compare_seg_mip_images("/data/kfchen/trace_ws/result500_164_250_source/tif",
+                           "/data/kfchen/trace_ws/result500_newpre_source/tif",
+                           "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/compare_seg_mip_<v1.4_164_250_source>_vs_<v1.4_result500_newpre_source>")
 
 
 

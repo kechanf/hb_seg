@@ -183,7 +183,7 @@ def l_measure_gt_and_pred(gt_dir, pred_dir, gt_csv, pred_csv, violin_png,
     plot_violin(df_gt, df_pred, violin_png)
 
 def compare_l_measure():
-    gt_dir = r"/data/kfchen/trace_ws/result500_e250+250_noptls_v2/v3dswc"
+    gt_dir = r"/data/kfchen/trace_ws/result500_newpre_source/v3dswc"
     # pred_dir = r"/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/10847_auto_v1.4_12k/swc"
     # gt_dir = (r"/data/kfchen/trace_ws/result500_164_500_aug_noptls/v3dswc")
     pred_dir = r"/data/kfchen/trace_ws/result500_e250+250_ptls_v2/v3dswc"
