@@ -59,22 +59,30 @@ class nnUNetDataLoader3D(nnUNetDataLoaderBase):
             # be padded with -1 constant whereas seg_from_previous_stage needs to be padded with 0s (we could also
             # remove label -1 in the data augmentation but this way it is less error prone)
             this_slice = tuple([slice(0, data.shape[0])] + [slice(i, j) for i, j in zip(valid_bbox_lbs, valid_bbox_ubs)])
-            data = data[this_slice]
+            # data = data[this_slice]
 
             _, cc_num = cc3d.connected_components(seg[0].copy(), connectivity=26, return_N=True)
             if (cc_num > 1):
                 print(f"cc_num: {cc_num} in generate_train_batch step 1, shape:{seg[0].shape}")
 
+            # print(seg.shape)
             this_slice = tuple([slice(0, seg.shape[0])] + [slice(i, j) for i, j in zip(valid_bbox_lbs, valid_bbox_ubs)])
-            seg = seg[this_slice]
+            # seg = seg[this_slice]
+
 
             _, cc_num = cc3d.connected_components(seg[0].copy(), connectivity=26, return_N=True)
             if (cc_num > 1):
+                print(this_slice)
                 print(f"cc_num: {cc_num} in generate_train_batch step 2, shape:{seg[0].shape}")
 
-            padding = [(-min(0, bbox_lbs[i]), max(bbox_ubs[i] - shape[i], 0)) for i in range(dim)]
-            # print(f"padding: {padding}")
+            # padding = [(-min(0, bbox_lbs[i]), max(bbox_ubs[i] - shape[i], 0)) for i in range(dim)]
+            # padding = ((0, 0), *padding)
+            # print(padding)
+            patch_size = self.patch_size
+            padding = [(max(0, (p - s) // 2), max(0, (p - s + 1) // 2)) for s, p in zip(data[0].shape, patch_size)]
             padding = ((0, 0), *padding)
+            # print(data.shape, patch_size, padding)
+            # print(padding)
             data_all[j] = np.pad(data, padding, 'constant', constant_values=0)
             seg_all[j] = np.pad(seg, padding, 'constant', constant_values=0)
             seg_all[j] = np.where(seg_all[j] > 0, 1, 0)

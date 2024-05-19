@@ -258,7 +258,7 @@ def generate_test_data(test_source, imagests, raw_info_path, mutisoma_marker_pat
     progress_bar = tqdm(total=len(images), desc="Copying img", unit="file")
     for im, id in zip(images, ids):
         progress_bar.update(1)
-        if(id < 12697):
+        if(id < 12497 or id >= 12697):
             continue
         target_name = f'image_{(id):03d}'
 
@@ -425,10 +425,10 @@ def count_connected_components_in_tif_files(directory_path): # 确定所有TIF�
     print(f"max_z: {max_z}, min_z: {min_z}, mean_z: {mean_z / len(os.listdir(directory_path)) * 2}")
 
 if __name__ == '__main__':
-    directory_path = '/data/kfchen/nnUNet/nnUNet_preprocessed/Dataset167_human_brain_10000_noptls/gt_segmentations'
-    count_connected_components_in_tif_files(directory_path)
-    print("done")
-    time.sleep(123132)
+    # directory_path = '/data/kfchen/nnUNet/nnUNet_preprocessed/Dataset167_human_brain_10000_noptls/gt_segmentations'
+    # count_connected_components_in_tif_files(directory_path)
+    # print("done")
+    # time.sleep(123132)
 
     nnUNet_raw = r"/data/kfchen/nnUNet/nnUNet_raw"
     raw_info_path = "/home/kfchen/dataset/img/raw_info.xlsx"
@@ -436,7 +436,7 @@ if __name__ == '__main__':
     label_info_path = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/label/label_info.xlsx"
 
     # dataset_name = 'Dataset101_human_brain_10000_ssoma_test'
-    dataset_name = 'Dataset103_human_brain_12497_add'
+    dataset_name = 'Dataset104_human_brain_12497_add'
     # images_dir = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/image"
     # seg_dir = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/label"
     images_dir = "/data/kfchen/trace_ws/resized_dataset/img"

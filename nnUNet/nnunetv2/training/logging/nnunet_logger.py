@@ -124,8 +124,8 @@ class nnUNetLogger(object):
         self.my_fantastic_logging = checkpoint
         pre_train_epochs = len(self.my_fantastic_logging['train_losses'])
         if("train_ptls" not in self.my_fantastic_logging.keys()):
-            self.my_fantastic_logging["train_ptls"] = [1] * pre_train_epochs
-            self.my_fantastic_logging["val_ptls"] = [1] * pre_train_epochs
+            self.my_fantastic_logging["train_ptls"] = [0] * pre_train_epochs
+            self.my_fantastic_logging["val_ptls"] = [0] * pre_train_epochs
             self.my_fantastic_logging["train_ce"] = [0] * pre_train_epochs
             self.my_fantastic_logging["val_ce"] = [0] * pre_train_epochs
             self.my_fantastic_logging["train_dice"] = [-1] * pre_train_epochs
