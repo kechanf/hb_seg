@@ -92,8 +92,8 @@ def get_sorted_files(directory, suffix='.v3draw'):
     v3draw_files = []
     for root, dirs, files in os.walk(directory):
         for file in files:
-            if file.endswith(suffix) and "_i" not in file and "_p" not in file:
-                v3draw_files.append(os.path.join(root, file))
+            # if file.endswith(suffix) and "_i" not in file and "_p" not in file:
+            v3draw_files.append(os.path.join(root, file))
 
     v3draw_files.sort()
     return v3draw_files
@@ -242,6 +242,7 @@ def generate_test_data(test_source, imagests, raw_info_path, mutisoma_marker_pat
     }
 
     images = get_sorted_files(test_source, suffix='.v3draw')
+    # print(images)
     ids = [int(im.split('/')[-1].split('_')[0]) for im in images]
     # gt_files = get_sorted_files("/data/kfchen/nnUNet/gt_swc", suffix='.swc')
     # gt_ids = [int(im.split('/')[-1].split('_')[0]) for im in gt_files]
@@ -258,19 +259,19 @@ def generate_test_data(test_source, imagests, raw_info_path, mutisoma_marker_pat
     progress_bar = tqdm(total=len(images), desc="Copying img", unit="file")
     for im, id in zip(images, ids):
         progress_bar.update(1)
-        if(id < 12497 or id >= 12697):
-            continue
+        # if(id < 12497 or id >= 12697):
+        #     continue
         target_name = f'image_{(id):03d}'
 
         file_name = im.split('/')[-1]
         muti_soma_marker_path = find_muti_soma_marker_file(file_name, mutisoma_marker_path)
-        if ((generate_muti_soma == 0) and (
-        not (muti_soma_marker_path is None))):  # skip the image with muti soma marker
-            print(f"Skip {im} because of {muti_soma_marker_path}")
-            continue
-        elif (generate_muti_soma == 1 and (muti_soma_marker_path)):  # skip single soma cases
-            print(f"Skip {im} because of {muti_soma_marker_path}")
-            continue
+        # if ((generate_muti_soma == 0) and (
+        # not (muti_soma_marker_path is None))):  # skip the image with muti soma marker
+        #     print(f"Skip {im} because of {muti_soma_marker_path}")
+        #     continue
+        # elif (generate_muti_soma == 1 and (muti_soma_marker_path)):  # skip single soma cases
+        #     print(f"Skip {im} because of {muti_soma_marker_path}")
+        #     continue
 
         img_size = [1, 1, 1]
         spacing = get_spacing(im, raw_info_path)
@@ -436,12 +437,13 @@ if __name__ == '__main__':
     label_info_path = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/label/label_info.xlsx"
 
     # dataset_name = 'Dataset101_human_brain_10000_ssoma_test'
-    dataset_name = 'Dataset104_human_brain_12497_add'
+    dataset_name = 'Dataset105_human_brain_ou'
     # images_dir = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/image"
     # seg_dir = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/label"
     images_dir = "/data/kfchen/trace_ws/resized_dataset/img"
     seg_dir = "/data/kfchen/trace_ws/resized_dataset/lab"
-    test_source = "/PBshare/SEU-ALLEN/Projects/Human_Neurons/all_human_cells/all_human_cells_v3draw"
+    # test_source = "/PBshare/SEU-ALLEN/Projects/Human_Neurons/all_human_cells/all_human_cells_v3draw"
+    test_source = "/PBshare/SEU-ALLEN/Projects/humanNeuron_for_CAR_v3draw/pre_after_IHC_data_v3draw_forDrOu_20240506"
     imagestr = join(nnUNet_raw, dataset_name, "imagesTr")
     labelstr = join(nnUNet_raw, dataset_name, "labelsTr")
     imagests = join(nnUNet_raw, dataset_name, "imagesTs")
