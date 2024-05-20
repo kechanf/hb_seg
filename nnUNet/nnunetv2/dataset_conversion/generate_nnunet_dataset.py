@@ -423,10 +423,10 @@ def count_connected_components_in_tif_files(directory_path): # 确定所有TIF�
     print(f"max_z: {max_z}, min_z: {min_z}, mean_z: {mean_z / len(os.listdir(directory_path)) * 2}")
 
 if __name__ == '__main__':
-    # directory_path = '/data/kfchen/nnUNet/nnUNet_preprocessed/Dataset167_human_brain_10000_noptls/gt_segmentations'
-    # count_connected_components_in_tif_files(directory_path)
-    # print("done")
-    # time.sleep(123132)
+    directory_path = '/data/kfchen/nnUNet/nnUNet_raw/Dataset102_human_brain_test500/imagesTs'
+    update_spacing_in_json_files(directory_path)
+    print("done")
+    time.sleep(123132)
 
     nnUNet_raw = r"/data/kfchen/nnUNet/nnUNet_raw"
     raw_info_path = "/home/kfchen/dataset/img/raw_info.xlsx"

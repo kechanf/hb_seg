@@ -177,23 +177,28 @@ class DefaultPreprocessor(object):
             cropped_image (numpy.ndarray): The cropped and padded or cropped image.
             cropped_seg (numpy.ndarray): The cropped and padded or cropped segmentation label.
         """
-        assert image.shape == seg.shape, "Image and segmentation label must have the same shape."
+        # assert image.shape == seg.shape, "Image and segmentation label must have the same shape."
 
         # Get the bounding box of the non-zero region in the segmentation label
-        non_zero_coords = np.argwhere(seg)
+        if(seg):
+            non_zero_coords = np.argwhere(seg)
+        else:
+            non_zero_coords = np.argwhere(image)
         min_coords = non_zero_coords.min(axis=0)
         max_coords = non_zero_coords.max(axis=0) + 1  # add 1 to include the max coordinate
 
         # Crop the image and segmentation label
         cropped_image = image[min_coords[0]:max_coords[0], min_coords[1]:max_coords[1], min_coords[2]:max_coords[2]]
-        cropped_seg = seg[min_coords[0]:max_coords[0], min_coords[1]:max_coords[1], min_coords[2]:max_coords[2]]
+        if(seg):
+            cropped_seg = seg[min_coords[0]:max_coords[0], min_coords[1]:max_coords[1], min_coords[2]:max_coords[2]]
 
         # Calculate the dimensions after cropping
         cropped_shape = cropped_image.shape
 
         # Initialize padded shape
         padded_image = np.zeros(patch_size, dtype=image.dtype)
-        padded_seg = np.zeros(patch_size, dtype=seg.dtype)
+        if(seg):
+            padded_seg = np.zeros(patch_size, dtype=seg.dtype)
 
         # Calculate the start indices for padding or cropping to center the content
 
@@ -211,12 +216,15 @@ class DefaultPreprocessor(object):
         # Insert the cropped content into the padded arrays
         padded_image[start_idx[0]:end_idx[0], start_idx[1]:end_idx[1], start_idx[2]:end_idx[2]] = cropped_image[
             crop_slices[0], crop_slices[1], crop_slices[2]]
-        padded_seg[start_idx[0]:end_idx[0], start_idx[1]:end_idx[1], start_idx[2]:end_idx[2]] = cropped_seg[
-            crop_slices[0], crop_slices[1], crop_slices[2]]
+        if(seg):
+            padded_seg[start_idx[0]:end_idx[0], start_idx[1]:end_idx[1], start_idx[2]:end_idx[2]] = cropped_seg[
+                crop_slices[0], crop_slices[1], crop_slices[2]]
+            padded_seg = self.get_largest_connected_component(padded_seg)
 
-        padded_seg = self.get_largest_connected_component(padded_seg)
-
-        return np.array([padded_image]), np.array([padded_seg])
+        if(seg):
+            return np.array([padded_image]), np.array([padded_seg])
+        else:
+            return np.array([padded_image]), None
 
 
 
@@ -241,9 +249,12 @@ class DefaultPreprocessor(object):
         # if possible, load seg
         if seg_file is not None:
             seg, _ = rw.read_seg(seg_file)
+            data, seg = self.crop_and_pad(data[0], seg[0], (80, 256, 256))
         else:
             seg = None
-        data, seg = self.crop_and_pad(data[0], seg[0], (80, 256, 256))
+            data, seg = self.crop_and_pad(data[0], None, (80, 256, 256))
+
+
 
         # print(f"shape before preprocessing: {data.shape}, {seg.shape if seg is not None else None}")
         data, seg = self.run_case_npy(data, seg, data_properties, plans_manager, configuration_manager,

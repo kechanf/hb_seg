@@ -64,8 +64,8 @@ elif (sys.platform == "linux"):
 # pred_folder_path = os.path.join(pred_path, "3d_cascade_fullres")
 # pred_path = r"D:\tracing_ws\nnUNet\nnUNet_results\150_test1223"
 # pred_path = r"E:\tracing_ws\10847\TEST10K7"
-data_source_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/Dataset105_human_brain_ou"
-result_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/result_ou_v2"
+data_source_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/Dataset102_human_brain_test500"
+result_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/result500_newpre_source_v3"
 
 trace_ws_path = r"/data/kfchen/trace_ws"
 # make dir for new result folder
