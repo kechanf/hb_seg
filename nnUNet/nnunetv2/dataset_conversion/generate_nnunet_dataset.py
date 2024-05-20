@@ -92,8 +92,8 @@ def get_sorted_files(directory, suffix='.v3draw'):
     v3draw_files = []
     for root, dirs, files in os.walk(directory):
         for file in files:
-            if file.endswith(suffix) and "_i" not in file and "_p" not in file:
-                v3draw_files.append(os.path.join(root, file))
+            # if file.endswith(suffix) and "_i" not in file and "_p" not in file:
+            v3draw_files.append(os.path.join(root, file))
 
     v3draw_files.sort()
     return v3draw_files
@@ -258,43 +258,41 @@ def generate_test_data(test_source, imagests, raw_info_path, mutisoma_marker_pat
     progress_bar = tqdm(total=len(images), desc="Copying img", unit="file")
     for im, id in zip(images, ids):
         progress_bar.update(1)
-        if(id < 12497 or id >= 12697):
-            continue
         target_name = f'image_{(id):03d}'
 
         file_name = im.split('/')[-1]
         muti_soma_marker_path = find_muti_soma_marker_file(file_name, mutisoma_marker_path)
-        if ((generate_muti_soma == 0) and (
-        not (muti_soma_marker_path is None))):  # skip the image with muti soma marker
-            print(f"Skip {im} because of {muti_soma_marker_path}")
-            continue
-        elif (generate_muti_soma == 1 and (muti_soma_marker_path)):  # skip single soma cases
-            print(f"Skip {im} because of {muti_soma_marker_path}")
-            continue
+        # if ((generate_muti_soma == 0) and (
+        # not (muti_soma_marker_path is None))):  # skip the image with muti soma marker
+        #     print(f"Skip {im} because of {muti_soma_marker_path}")
+        #     continue
+        # elif (generate_muti_soma == 1 and (muti_soma_marker_path)):  # skip single soma cases
+        #     print(f"Skip {im} because of {muti_soma_marker_path}")
+        #     continue
 
         img_size = [1, 1, 1]
         spacing = get_spacing(im, raw_info_path)
 
-        try:
-            img = load_image(im, False)[0].astype("uint8")
-            img_size = img.shape
-            if (not os.path.exists(join(imagests, target_name + '_0000.tif'))):
-                # print(img.shape)
-                img = augment_gamma(img)
-                # block reduce
-                factor = 2
-                img = block_reduce(img, block_size=(factor, factor, factor), func=np.max)
-                imwrite(join(imagests, target_name + '_0000.tif'), img.astype("uint8"))
+        # try:
+        img = load_image(im, False)[0].astype("uint8")
+        img_size = img.shape
+        if (not os.path.exists(join(imagests, target_name + '_0000.tif'))):
+            # print(img.shape)
+            img = augment_gamma(img)
+            # block reduce
+            factor = 2
+            img = block_reduce(img, block_size=(factor, factor, factor), func=np.max)
+            imwrite(join(imagests, target_name + '_0000.tif'), img.astype("uint8"))
 
-                # spacing file!
-                save_json({'spacing': spacing}, join(imagests, target_name + '.json'))
-        except Exception as e:
-            if (os.path.exists(join(imagests, target_name + '_0000.tif'))):
-                os.remove(join(imagests, target_name + '_0000.tif'))
-            if (os.path.exists(join(imagests, target_name + '.json'))):
-                os.remove(join(imagests, target_name + '.json'))
-            # with open(f"error_log.txt", "a") as file:
-            #     file.write(f"An error occurred: {e} at {im}\n")
+            # spacing file!
+            save_json({'spacing': spacing}, join(imagests, target_name + '.json'))
+        # except Exception as e:
+        #     if (os.path.exists(join(imagests, target_name + '_0000.tif'))):
+        #         os.remove(join(imagests, target_name + '_0000.tif'))
+        #     if (os.path.exists(join(imagests, target_name + '.json'))):
+        #         os.remove(join(imagests, target_name + '.json'))
+        #     # with open(f"error_log.txt", "a") as file:
+        #     #     file.write(f"An error occurred: {e} at {im}\n")
 
         temp_im = im.split('/')[-1]
         if (im.endswith('.v3draw')):
@@ -436,12 +434,13 @@ if __name__ == '__main__':
     label_info_path = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/label/label_info.xlsx"
 
     # dataset_name = 'Dataset101_human_brain_10000_ssoma_test'
-    dataset_name = 'Dataset104_human_brain_12497_add'
+    dataset_name = 'Dataset106_human_brain_ou'
     # images_dir = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/image"
     # seg_dir = "/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/label"
     images_dir = "/data/kfchen/trace_ws/resized_dataset/img"
     seg_dir = "/data/kfchen/trace_ws/resized_dataset/lab"
-    test_source = "/PBshare/SEU-ALLEN/Projects/Human_Neurons/all_human_cells/all_human_cells_v3draw"
+    # test_source = "/PBshare/SEU-ALLEN/Projects/Human_Neurons/all_human_cells/all_human_cells_v3draw"
+    test_source = "/PBshare/SEU-ALLEN/Projects/humanNeuron_for_CAR_v3draw/pre_after_IHC_data_v3draw_forDrOu_20240506"
     imagestr = join(nnUNet_raw, dataset_name, "imagesTr")
     labelstr = join(nnUNet_raw, dataset_name, "labelsTr")
     imagests = join(nnUNet_raw, dataset_name, "imagesTs")
