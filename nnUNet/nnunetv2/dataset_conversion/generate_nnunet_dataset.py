@@ -422,9 +422,46 @@ def count_connected_components_in_tif_files(directory_path): # 确定所有TIF�
                 print(f"{filename} is not a 3D image.")
     print(f"max_z: {max_z}, min_z: {min_z}, mean_z: {mean_z / len(os.listdir(directory_path)) * 2}")
 
+def split_test():
+    import random
+    # 主文件夹路径
+    source_folder = '/data/kfchen/nnUNet/nnUNet_raw/Dataset164_human_brain_resized_10k_source/imagesTr'
+    # 测试集文件夹路径
+    test_folder = '/data/kfchen/nnUNet/nnUNet_raw/Dataset164_human_brain_resized_10k_source/imagesTs'
+
+    # 创建测试集文件夹（如果不存在）
+    os.makedirs(test_folder, exist_ok=True)
+
+    # 获取文件列表
+    files = os.listdir(source_folder)
+
+    # 筛选出 .json 文件并提取对应的基名
+    json_files = [f for f in files if f.endswith('.json')]
+    base_names = [os.path.splitext(f)[0] for f in json_files]
+
+    # 随机选择20%的基名
+    test_size = int(len(base_names) * 0.2)
+    test_base_names = random.sample(base_names, test_size)
+
+    # 将对应的 .json 和 .tif 文件移动到测试集文件夹
+    for base_name in test_base_names:
+        json_file = base_name + '.json'
+        tif_files = [f for f in files if f.startswith(base_name) and f.endswith('.tif')]
+
+        # 移动 .json 文件
+        shutil.move(os.path.join(source_folder, json_file), os.path.join(test_folder, json_file))
+
+        # 移动所有对应的 .tif 文件
+        for tif_file in tif_files:
+            shutil.move(os.path.join(source_folder, tif_file), os.path.join(test_folder, tif_file))
+
+    print(f"Successfully moved {test_size} pairs of files to the test folder.")
+
+
 if __name__ == '__main__':
-    directory_path = '/data/kfchen/nnUNet/nnUNet_raw/Dataset102_human_brain_test500/imagesTs'
-    update_spacing_in_json_files(directory_path)
+    # directory_path = '/data/kfchen/nnUNet/nnUNet_raw/Dataset102_human_brain_test500/imagesTs'
+    # update_spacing_in_json_files(directory_path)
+    split_test()
     print("done")
     time.sleep(123132)
 
