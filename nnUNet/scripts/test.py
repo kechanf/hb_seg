@@ -65,7 +65,7 @@ elif (sys.platform == "linux"):
 # pred_path = r"D:\tracing_ws\nnUNet\nnUNet_results\150_test1223"
 # pred_path = r"E:\tracing_ws\10847\TEST10K7"
 data_source_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/Dataset102_human_brain_test500"
-result_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/result500_newpre_source_v3"
+result_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/result500_newpre_source_v3_no_z"
 
 trace_ws_path = r"/data/kfchen/trace_ws"
 # make dir for new result folder
@@ -1238,9 +1238,9 @@ def compare_tif(folder1, folder2, out_folder):
 
 
 def prepossessing():
-    remove_others_in_folder(tif_folder_path)
-    rename_tif_folder(tif_folder_path)
-    uint8_tif_folder(tif_folder_path)
+    # remove_others_in_folder(tif_folder_path)
+    # rename_tif_folder(tif_folder_path)
+    # uint8_tif_folder(tif_folder_path)
     # #
     # # # ###########adf_folder(tif_folder_path, adf_folder_path)
     # #
