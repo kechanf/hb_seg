@@ -140,8 +140,8 @@ def l_measure_gt_and_pred(gt_dir, pred_dir, gt_csv, pred_csv, violin_png,
     gt_files.sort()
     pred_files.sort()
 
-    gt_ids = [int(os.path.split(f)[-1].split('_')[0]) for f in gt_files]
-    pred_ids = [int(os.path.split(f)[-1].split('_')[0]) for f in pred_files]
+    gt_ids = [int(os.path.split(f)[-1].split('_')[0].split('.')[0]) for f in gt_files]
+    pred_ids = [int(os.path.split(f)[-1].split('_')[0].split('.')[0]) for f in pred_files]
     shared_ids = list(set(gt_ids) & set(pred_ids))
 
     # debug
@@ -183,10 +183,10 @@ def l_measure_gt_and_pred(gt_dir, pred_dir, gt_csv, pred_csv, violin_png,
     plot_violin(df_gt, df_pred, violin_png)
 
 def compare_l_measure():
-    gt_dir = r"/data/kfchen/trace_ws/result500_newpre_source/v3dswc"
+    gt_dir = r"/data/kfchen/trace_ws/result500_new_resized_test_noptls/connswc"
     # pred_dir = r"/PBshare/SEU-ALLEN/Users/KaifengChen/human_brain/10847_auto_v1.4_12k/swc"
     # gt_dir = (r"/data/kfchen/trace_ws/result500_164_500_aug_noptls/v3dswc")
-    pred_dir = r"/data/kfchen/trace_ws/result500_e250+250_ptls_v2/v3dswc"
+    pred_dir = r"/data/kfchen/trace_ws/result500_new_resized_test_ptls/connswc"
 
     gt_csv = r"/data/kfchen/nnUNet/gt_swc.csv"
     pred_csv = r"/data/kfchen/nnUNet/pred_swc.csv"
@@ -202,15 +202,15 @@ def compare_l_measure():
 
     l_measure_gt_and_pred(gt_dir, pred_dir, gt_csv, pred_csv, violin_png, v3d_path=v3d_path)
 
-def compare_tip_to_soma(traced_dir1 = r"/data/kfchen/trace_ws/result500_e1000/v3dswc",
-                        traced_dir2 = r"/data/kfchen/trace_ws/result500_e1000+250_ptls/v3dswc"):
+def compare_tip_to_soma(traced_dir1 = r"/data/kfchen/trace_ws/result500_new_resized_test_noptls/connswc",
+                        traced_dir2 = r"/data/kfchen/trace_ws/result500_new_resized_test_ptls/connswc"):
     dir1_files = glob.glob(os.path.join(traced_dir1, '*swc'))
     dir2_files = glob.glob(os.path.join(traced_dir2, '*swc'))
     dir1_files.sort()
     dir2_files.sort()
 
-    dir1_ids = [int(os.path.split(f)[-1].split('_')[0]) for f in dir1_files]
-    dir2_ids = [int(os.path.split(f)[-1].split('_')[0]) for f in dir2_files]
+    dir1_ids = [int(os.path.split(f)[-1].split('_')[0].split('.')[0]) for f in dir1_files]
+    dir2_ids = [int(os.path.split(f)[-1].split('_')[0].split('.')[0]) for f in dir2_files]
     shared_ids = list(set(dir1_ids) & set(dir2_ids))
 
     dir1_mean_tip_to_soma_dist_list = []

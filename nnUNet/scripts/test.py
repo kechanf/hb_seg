@@ -64,8 +64,8 @@ elif (sys.platform == "linux"):
 # pred_folder_path = os.path.join(pred_path, "3d_cascade_fullres")
 # pred_path = r"D:\tracing_ws\nnUNet\nnUNet_results\150_test1223"
 # pred_path = r"E:\tracing_ws\10847\TEST10K7"
-data_source_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/Dataset102_human_brain_test500"
-result_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/result500_newpre_source_v3_z"
+data_source_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/Dataset164_human_brain_resized_10k_source"
+result_folder_path = r"/data/kfchen/nnUNet/nnUNet_raw/result500_new_resized_test_ptls"
 
 trace_ws_path = r"/data/kfchen/trace_ws"
 # make dir for new result folder
@@ -99,8 +99,9 @@ gmsoma_marker_folder_path = os.path.join(pred_path, "gmsoma_markers")
 # muti_soma_marker_folder_path = r"E:\tracing_ws\10847\muti_soma_markers"
 muti_soma_marker_folder_path = r"/data/kfchen/trace_ws/muti_soma_markers"
 name_mapping_path = os.path.join(pred_path, "name_mapping.csv")
-if(not os.path.exists(name_mapping_path)):
-    shutil.copy(os.path.join(data_source_folder_path, "name_mapping.csv"), name_mapping_path)
+if(os.path.exists(name_mapping_path)):
+    os.remove(name_mapping_path)
+shutil.copy(os.path.join(data_source_folder_path, "name_mapping.csv"), name_mapping_path)
 v3dswc_copy_folder_path = os.path.join(pred_path, "v3dswc_copy")
 
 # pbd_folder_path = r"D:\tracing_ws\dataset\test1223"
@@ -1238,9 +1239,9 @@ def compare_tif(folder1, folder2, out_folder):
 
 
 def prepossessing():
-    remove_others_in_folder(tif_folder_path)
-    rename_tif_folder(tif_folder_path)
-    uint8_tif_folder(tif_folder_path)
+    # remove_others_in_folder(tif_folder_path)
+    # rename_tif_folder(tif_folder_path)
+    # uint8_tif_folder(tif_folder_path)
     # #
     # # # ###########adf_folder(tif_folder_path, adf_folder_path)
     # #
