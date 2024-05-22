@@ -32,8 +32,8 @@ class AddPredecessorImageTransform(AbstractTransform):
             for channel_idx in range(target.shape[1]):
                 current_target = target[batch_idx, channel_idx]
                 # max_cc = self.get_max_cc(current_target)
-                # current_predecessor, current_soma = get_fmm_from_img(current_target
-                current_predecessor, current_soma = np.ones_like(current_target) * -1, np.zeros(3)
+                current_predecessor, current_soma = get_fmm_from_img(current_target)
+                # current_predecessor, current_soma = np.ones_like(current_target) * -1, np.zeros(3)
                 # if(np.sum(max_cc) / np.sum(current_target) < 0.5):
                 #     current_predecessor = None
                 #     current_soma = None
