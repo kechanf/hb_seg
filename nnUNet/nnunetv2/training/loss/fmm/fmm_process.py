@@ -82,10 +82,10 @@ def muti_cc_image_check(image):
         # for i, size in enumerate(component_sizes, 1):
         #     print(f"连通块 {i} 的大小为: {size}")
 
-        if(N > 5):
-            # 保存MIP图
-            save_mip_image(image)
-            return True
+        # if(N > 5):
+        #     # 保存MIP图
+        #     save_mip_image(image)
+        #     return True
         return False
     else:
         return False

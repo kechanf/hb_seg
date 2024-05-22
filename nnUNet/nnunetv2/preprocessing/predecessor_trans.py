@@ -16,6 +16,10 @@ class AddPredecessorImageTransform(AbstractTransform):
         self.target_key = target_key
         self.soma_key = soma_key
 
+    def get_max_cc(self, img):
+        labels_out = cc3d.connected_components(img)
+        max_cc = np.argmax(np.bincount(labels_out.flat)[1:])
+        return max_cc
     def __call__(self, **data_dict):
         target_shape = data_dict[self.target_key].shape
         data_dict[self.predecessor_key] = np.zeros(target_shape, dtype=np.int32) # (2, 1, 48, 224, 224)
@@ -27,7 +31,13 @@ class AddPredecessorImageTransform(AbstractTransform):
         for batch_idx in range(target.shape[0]):
             for channel_idx in range(target.shape[1]):
                 current_target = target[batch_idx, channel_idx]
-                current_predecessor, current_soma = get_fmm_from_img(current_target)
+                # max_cc = self.get_max_cc(current_target)
+                # current_predecessor, current_soma = get_fmm_from_img(current_target
+                current_predecessor, current_soma = np.ones_like(current_target) * -1, np.zeros(3)
+                # if(np.sum(max_cc) / np.sum(current_target) < 0.5):
+                #     current_predecessor = None
+                #     current_soma = None
+                #     print("fuck in AddPredecessorImageTransform")
                 if((current_predecessor is None) or (current_soma is None)):
                     # print("... no predecessor found for batch_idx: ", batch_idx, " channel_idx: ", channel_idx)
                     data_dict[self.predecessor_key][batch_idx, channel_idx] = np.ones_like(current_target) * -1

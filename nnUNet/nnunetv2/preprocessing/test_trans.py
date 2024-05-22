@@ -109,10 +109,10 @@ class SimpleTransform(AbstractTransform):
             # generate_mip_images(data, seg)
 
             # print(f"data.shape, seg.shape: {data.shape, seg.shape} in TestTransform")
-            _, cc_num = cc3d.connected_components(seg[0], connectivity=26, return_N=True)
-            if(cc_num > 1):
-                print("fuckkkkkkkkkkkkkkkkkkkkk in SimpleTransform")
-                # generate_mip_images(data, seg)
+            # _, cc_num = cc3d.connected_components(seg[0], connectivity=26, return_N=True)
+            # if(cc_num > 1):
+            #     print("fuckkkkkkkkkkkkkkkkkkkkk in SimpleTransform")
+            #     # generate_mip_images(data, seg)
 
             scaled_data.append(data)
             scaled_seg.append(seg)
@@ -140,10 +140,10 @@ class TestTransform(AbstractTransform):
             data = data_dict['data'][batch]
             seg = data_dict['target'][batch]
 
-            _, cc_num = cc3d.connected_components(seg[0], connectivity=26, return_N=True)
-            if(cc_num > 1):
-                print("fuckkkkkkkkkkkkkkkkkkkkk in TestTransform")
-                # generate_mip_images(data, seg)
+            # _, cc_num = cc3d.connected_components(seg[0], connectivity=26, return_N=True)
+            # if(cc_num > 1):
+            #     print("fuckkkkkkkkkkkkkkkkkkkkk in TestTransform")
+            #     # generate_mip_images(data, seg)
 
             scaled_data.append(data)
             scaled_seg.append(seg)
