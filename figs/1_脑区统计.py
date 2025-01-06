@@ -59,12 +59,12 @@ brain_regions = df['brain_region'].tolist()
 # exit()
 
 brain_region_map = {
-    'frontal lobe': ['FL.L', 'FL.R', 'FL_TL.L'],
+    'frontal lobe': ['FL.L', 'FL.R', 'FL_TL.L', 'FP.R', 'FP.L', ],
     "superior frontal gyrus": ["SFG.R", "SFG.L", "SFG", "S(M)FG.R", "M(I)FG.L"],
     "middle frontal gyrus": ["MFG.R", "MFG", "MFG.L"],
     "inferior frontal gyrus": ["IFG.R", "(X)FG", "IFG"],
     #
-    'temporal lobe': ['TL.L', 'TL.R'],
+    'temporal lobe': ['TL.L', 'TL.R', "TP", "TP.L", "TP.R", 'FT.L'],
     "superior temporal gyrus": ["STG", "STG.R", "S(M)TG.R", "S(M)TG.L", "STG-AP", "S(M,I)TG"],
     "middle temporal gyrus": ["MTG.R", "MTG.L", "MTG"],
 
@@ -75,7 +75,7 @@ brain_region_map = {
 
 
     # 'posterior lateral ventricle': ['pLV.L'],
-    'others': ['CB_tonsil.L', 'FP.R', 'FP.L', 'BN.L', 'FT.L', 'CC.L', "TP", "TP.L", "TP.R"],
+    'others': ['CB_tonsil.L', 'BN.L', 'CC.L',],
 }
 
 mapped_brain_regions = []

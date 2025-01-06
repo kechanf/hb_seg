@@ -120,6 +120,18 @@ def plot_stacked_age_gender_distribution_patient(csv_file, traced_csv_file):
 def plot_stacked_age_gender_distribution2(csv_file):
     # 读取 CSV 文件
     df = pd.read_csv(csv_file)
+    total_recon_list = pd.read_csv("/data/kfchen/trace_ws/paper_trace_result/csv_copy/final_recon_list.csv")['id'].tolist()
+    df = df[df['id'].isin(total_recon_list)]
+    print(len(df))
+
+    # 检查总的性别分布
+    male_list = df[df['gender'] == 'Male']['id'].tolist()
+    female_list = df[df['gender'] == 'Female']['id'].tolist()
+    # print(f"male: {len(male_list)}, f: {len(female_list)}")
+    # print(len(male_list)/len(df), len(female_list)/len(df), )
+    print(f"male: {len(male_list)}, ratio: {len(male_list) / len(df) * 100:.2f}%")
+    print(f"male: {len(female_list)}, ratio: {len(female_list) / len(df) * 100:.2f}%")
+
 
     # 创建年龄区间，这里以10年为一个区间进行分组
     bins = range(int(df['age'].min()), int(df['age'].max()) + 10, 10)
@@ -131,13 +143,17 @@ def plot_stacked_age_gender_distribution2(csv_file):
     total_samples = len(df)
     male_samples = len(df[df['gender'] == 'Male'])  # 假设性别列中男性标记为'男性'
     male_ratio = male_samples / total_samples * 100  # 以百分比表示
-    print(min_age, max_age, male_ratio)
+    # print(min_age, max_age)
+    print(f"max age: {max_age}, min age: {min_age}, mean age: {df['age'].mean()}")
 
     # 按年龄分组并按性别计数
     age_gender_distribution = df.groupby(['AgeGroup', 'gender']).size().unstack(fill_value=0)
 
     # 设定颜色代码
     colors = ['#F7B7D2', '#B8E5FA']  # 蓝色男性，粉色女性
+
+    # 设置清晰度
+    plt.rcParams['savefig.dpi'] = 300
 
     # 绘制堆叠柱状图
     # 向左对齐，以便在柱状图上添加数值标签
@@ -183,7 +199,8 @@ def plot_stacked_age_gender_distribution2(csv_file):
 
     plt.subplots_adjust(bottom=0.3)
     # 显示图表
-    plt.show()
+    # plt.show()
+    plt.savefig("/data/kfchen/trace_ws/paper_trace_result/age_gender_distribution.png")
     plt.close()
 # 指定 CSV 文件路径
 # csv_file = r"D:\tracing_ws\new_Human_SingleCell_TrackingTable_20240712.csv"

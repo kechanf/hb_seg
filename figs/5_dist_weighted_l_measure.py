@@ -25,9 +25,12 @@ feature_name_maps = {
     "Distence_Weighted_Number_of_Branches": "DW No. of Branches",
     "Distence_Weighted_Number_of_Bifurcatons": "DW No. of Bifurcations",
     "Distence_Weighted_Total_Length": "DW Length",
+    "Length_Weighted_Number_of_Tips": "No. of Tips*",
+    "Length_Weighted_Number_of_Branches": "No. of Branches*",
+    "Length_Weighted_Number_of_Bifurcatons": "No. of Bifurcations*",
 }
 
-def dist_weighted_map(current_x, x_max=100):
+def dist_weighted_map(current_x, x_max=200):
     # x = np.linspace(0, x_max, 1000)
     # y = np.where(x <= x_max, 1 - x / x_max, 0)
     # return np.interp(current_x, x, y)
@@ -37,6 +40,8 @@ def dist_weighted_map(current_x, x_max=100):
     else:
         return 0
 
+def length_weighted_map(current_x, x_max=200):
+    return current_x / x_max
 
 class L_measure_calculator:
     def __init__(self, G, img_shape=None):
@@ -49,20 +54,25 @@ class L_measure_calculator:
 
         self.l_measure = {
             'Number_of_Tips': self.get_num_of_tips(),
+            'Length_Weighted_Number_of_Tips': self.get_length_weighted_num_of_tips(),
             'Number_of_Branches': self.get_num_of_branches(),
+            'Length_Weighted_Number_of_Branches': self.get_length_weighted_num_of_branches(),
             'Number_of_Bifurcatons': self.get_num_of_bifurcations(),
-            'Total_Length': self.get_total_length(),
-            'Distence_Weighted_Number_of_Tips': self.get_dist_weighted_num_of_tips(),
-            'Distence_Weighted_Number_of_Branches': self.get_dist_weighted_num_of_branches(),
-            'Distence_Weighted_Number_of_Bifurcatons': self.get_dist_weighted_num_of_bifurcations(),
-            'Distence_Weighted_Total_Length': self.get_dist_weighted_total_length(),
+            # 'Total_Length': self.get_total_length(),
+            # 'Distence_Weighted_Number_of_Tips': self.get_dist_weighted_num_of_tips(),
+            # 'Distence_Weighted_Number_of_Branches': self.get_dist_weighted_num_of_branches(),
+            # 'Distence_Weighted_Number_of_Bifurcatons': self.get_dist_weighted_num_of_bifurcations(),
+            # 'Distence_Weighted_Total_Length': self.get_dist_weighted_total_length(),
+
+
+            'Length_Weighted_Number_of_Bifurcatons': self.get_length_weighted_num_of_bifurcations(),
         }
 
     def get_num_of_tips(self):
         num_of_tips = 0
         for node in self.nodes:
             if self.G.out_degree(node) == 0:
-                num_of_tips += 1
+                num_of_tips += 1.0
         return num_of_tips
 
     def get_dist_weighted_num_of_tips(self):
@@ -72,13 +82,41 @@ class L_measure_calculator:
         for node in self.nodes:
             if self.G.out_degree(node) == 0:
                 tip_node_list.append(node)
+
         dist_weighted_num_of_tips = 0
         for tip_node in tip_node_list:
             x, y, z = self.G.nodes[tip_node]['x'], self.G.nodes[tip_node]['y'], self.G.nodes[tip_node]['z']
             dist = np.sqrt((x-soma['x'])**2 + (y-soma['y'])**2 + (z-soma['z'])**2)
             # print(dist, max_dist, dist_weighted_map(dist, max_dist))
-            dist_weighted_num_of_tips += dist_weighted_map(dist, max_dist)
+            dist_weighted_num_of_tips += dist_weighted_map(dist, max_dist) * 1.0
         return dist_weighted_num_of_tips
+
+    def get_length_weighted_num_of_tips(self):
+        tip_node_list = []
+        max_dist = self.max_dist
+        for node in self.nodes:
+            if self.G.out_degree(node) == 0:
+                tip_node_list.append(node)
+
+        num_of_tips = 0
+        for tip_node in tip_node_list:
+            current_branch_nodes = [tip_node]
+            branch_length = 0
+            x_list, y_list, z_list = ([self.G.nodes[tip_node]['x']],
+                                        [self.G.nodes[tip_node]['y']],
+                                        [self.G.nodes[tip_node]['z']])
+            while self.G.out_degree(current_branch_nodes[-1]) == 1 or self.G.out_degree(current_branch_nodes[-1]) == 0:
+                if(len(list(self.G.predecessors(current_branch_nodes[-1]))) == 0):
+                    break
+                current_branch_nodes.append(list(self.G.predecessors(current_branch_nodes[-1]))[0])
+                x_list.append(self.G.nodes[current_branch_nodes[-1]]['x'])
+                y_list.append(self.G.nodes[current_branch_nodes[-1]]['y'])
+                z_list.append(self.G.nodes[current_branch_nodes[-1]]['z'])
+                branch_length += np.sqrt((x_list[-1]-x_list[-2])**2 + (y_list[-1]-y_list[-2])**2 + (z_list[-1]-z_list[-2])**2)
+
+            num_of_tips += length_weighted_map(branch_length, max_dist)
+        return num_of_tips
+
 
 
     def get_num_of_branches(self):
@@ -110,11 +148,36 @@ class L_measure_calculator:
             dist_weighted_num_of_branches += dist_weighted_map(dist, self.max_dist)
         return dist_weighted_num_of_branches
 
+    def get_length_weighted_num_of_branches(self):
+        branch_start_node_list = []
+        for node in self.nodes:
+            if self.G.out_degree(node) > 1 and node != 1:
+                # node 的 子节点
+                for child in self.G.successors(node):
+                        branch_start_node_list.append(child)
+        num_of_branches = 0
+        for branch_start_node in branch_start_node_list:
+            current_branch_nodes = [branch_start_node]
+            previous_node = list(self.G.predecessors(branch_start_node))[0]
+            branch_length = np.sqrt((self.G.nodes[branch_start_node]['x']-self.G.nodes[previous_node]['x'])**2 +
+                                    (self.G.nodes[branch_start_node]['y']-self.G.nodes[previous_node]['y'])**2 +
+                                    (self.G.nodes[branch_start_node]['z']-self.G.nodes[previous_node]['z'])**2)
+            x_list, y_list, z_list = ([self.G.nodes[branch_start_node]['x']],
+                                      [self.G.nodes[branch_start_node]['y']],
+                                      [self.G.nodes[branch_start_node]['z']])
+            while self.G.out_degree(current_branch_nodes[-1]) == 1:
+                current_branch_nodes.append(list(self.G.successors(current_branch_nodes[-1]))[0])
+                x_list.append(self.G.nodes[current_branch_nodes[-1]]['x'])
+                y_list.append(self.G.nodes[current_branch_nodes[-1]]['y'])
+                z_list.append(self.G.nodes[current_branch_nodes[-1]]['z'])
+                branch_length += np.sqrt((x_list[-1]-x_list[-2])**2 + (y_list[-1]-y_list[-2])**2 + (z_list[-1]-z_list[-2])**2)
+            num_of_branches += length_weighted_map(branch_length, self.max_dist)
+        return num_of_branches
 
     def get_num_of_bifurcations(self):
         num_of_bifurcations = 0
         for node in self.nodes:
-            if self.G.out_degree(node) > 1 and node != 1:
+            if self.G.out_degree(node) > 1:
                 num_of_bifurcations += 1
         return num_of_bifurcations
 
@@ -122,7 +185,7 @@ class L_measure_calculator:
         soma = self.G.nodes[1]
         bifurcation_node_list = []
         for node in self.nodes:
-            if self.G.out_degree(node) > 1 and node != 1:
+            if self.G.out_degree(node) > 1:
                 bifurcation_node_list.append(node)
         dist_weighted_num_of_bifurcations = 0
         for bifurcation_node in bifurcation_node_list:
@@ -130,6 +193,32 @@ class L_measure_calculator:
             dist = np.sqrt((x-soma['x'])**2 + (y-soma['y'])**2 + (z-soma['z'])**2)
             dist_weighted_num_of_bifurcations += dist_weighted_map(dist, self.max_dist)
         return dist_weighted_num_of_bifurcations
+
+    def get_length_weighted_num_of_bifurcations(self):
+        bifurcation_node_list = []
+        for node in self.nodes:
+            if self.G.out_degree(node) > 1:
+                bifurcation_node_list.append(node)
+        num_of_bifurcations = 0
+        for bifurcation_node in bifurcation_node_list:
+            total_connected_length = 0
+            for child in self.G.successors(bifurcation_node):
+                current_branch_nodes = [child]
+                branch_length = np.sqrt((self.G.nodes[child]['x']-self.G.nodes[bifurcation_node]['x'])**2 +
+                                        (self.G.nodes[child]['y']-self.G.nodes[bifurcation_node]['y'])**2 +
+                                        (self.G.nodes[child]['z']-self.G.nodes[bifurcation_node]['z'])**2)
+                x_list, y_list, z_list = ([self.G.nodes[child]['x']],
+                                          [self.G.nodes[child]['y']],
+                                          [self.G.nodes[child]['z']])
+                while self.G.out_degree(current_branch_nodes[-1]) == 1:
+                    current_branch_nodes.append(list(self.G.successors(current_branch_nodes[-1]))[0])
+                    x_list.append(self.G.nodes[current_branch_nodes[-1]]['x'])
+                    y_list.append(self.G.nodes[current_branch_nodes[-1]]['y'])
+                    z_list.append(self.G.nodes[current_branch_nodes[-1]]['z'])
+                    branch_length += np.sqrt((x_list[-1]-x_list[-2])**2 + (y_list[-1]-y_list[-2])**2 + (z_list[-1]-z_list[-2])**2)
+                total_connected_length += branch_length
+            num_of_bifurcations += length_weighted_map(total_connected_length, self.max_dist)
+        return num_of_bifurcations
 
     def get_total_length(self):
         total_length = 0
@@ -219,16 +308,25 @@ def get_comp_l_measure_df(pred_lm_df, gt_lm_df):
     return comp_lm_df
 
 def plot_comp_l_measure_df(comp_lm_df):
+    tab20_colors = plt.cm.get_cmap('tab20c', 20).colors
+    colors = [tab20_colors[9], tab20_colors[5],
+              tab20_colors[10], tab20_colors[6],
+              tab20_colors[11], tab20_colors[7],
+              ]
+
     comp_lm_df = comp_lm_df.dropna()
     # drop id
     comp_lm_df = comp_lm_df.drop(columns=['id'])
 
-    fig = plt.figure(figsize=(6, 6))
+    fig = plt.figure(figsize=(5, 5))
     #
     position = range(comp_lm_df.shape[1])
     # print(position)
     for i, feature in enumerate(comp_lm_df.columns):
         current_feature = comp_lm_df[feature].values
+        # print(f"{feature}: {current_feature}")
+        print(f"{feature}: {np.median(current_feature):.2f}")
+
         # 检查是否有nan
         if np.isnan(current_feature).any():
             print(f"{feature} has nan")
@@ -237,14 +335,41 @@ def plot_comp_l_measure_df(comp_lm_df):
             print(f"{feature} has inf")
             print(current_feature)
         # violin
-        plt.violinplot(current_feature, positions=[position[i]], showmeans=True, )
-        # print(f"{feature}: {np.mean(current_feature)}")
-        print(f"{feature}: {np.median(current_feature):.2f}")
+        violin_parts = plt.violinplot(current_feature, positions=[position[i]], widths=0.8,
+                          showmeans=False, showmedians=False, showextrema=False,
+                          )
+        for partname in ['bodies']:
+            for part in violin_parts[partname]:
+                part.set_edgecolor('black')  # 设置边缘线的颜色
+                part.set_linewidth(1)  # 设置边缘线的宽度
+                part.set_facecolor(colors[i])  # 设置填充颜色
+                # alpha
+                part.set_alpha(1)
 
-    plt.xticks(position, [feature_name_maps[feature] for feature in comp_lm_df.columns if feature != 'id'], rotation=45)
+        plt.boxplot(current_feature,
+                    positions=[position[i]], widths=0.4,
+                    patch_artist=True,
+                    showfliers=True,
+                    boxprops=dict(color='black', linewidth=1, facecolor='white'),
+
+                    capprops=dict(color='black'),
+                    medianprops=dict(color='black'),
+                    flierprops=dict(marker='o', color='black', markersize=3)
+                    )
+
+        # print(f"{feature}: {np.mean(current_feature)}")
+
+
+    plt.xticks(position, [feature_name_maps[feature] for feature in comp_lm_df.columns if feature != 'id'],
+               rotation=45, ha='right', fontsize=15)
+    plt.yticks(fontsize=12)
+    # 在y=1
+    plt.axhline(y=1, color='gray', linestyle='--')
+    plt.axhline(y=0.9, color='gray', linestyle='--')
+    plt.axhline(y=0.8, color='gray', linestyle='--')
     # plt.xticks(position, [feature for feature in comp_lm_df.columns if feature != 'id'], rotation=45)
-    plt.ylabel('Ratio')
-    plt.title('Comparison of L-measure')
+    plt.ylim(0.25, 1.75)
+    # plt.title('Comparison of L-measure')
     plt.tight_layout()
     plt.show()
     plt.close()
@@ -280,13 +405,25 @@ if __name__ == '__main__':
     # prepare_rescaled_img("/data/kfchen/trace_ws/to_gu/img", img_dir)
     # exit()
 
-    swc_dir = "/data/kfchen/trace_ws/paper_trace_result/nnunet/newcel_0.1/8_estimated_radius_swc"
-    auto_lm_df = l_measure_swc_dir(swc_dir, img_dir)
+    result_comp_lm_df_file = "/data/kfchen/trace_ws/paper_trace_result/nnunet/newcel_0.1/comp_lm_df.csv"
+    if os.path.exists(result_comp_lm_df_file):
+        comp_lm_df = pd.read_csv(result_comp_lm_df_file)
+    else:
+        swc_dir = "/data/kfchen/trace_ws/paper_trace_result/nnunet/newcel_0.1/8_estimated_radius_swc"
+        auto_lm_df = l_measure_swc_dir(swc_dir, img_dir)
 
-    swc_dir = "/data/kfchen/trace_ws/paper_auto_human_neuron_recon/swc_label/1um_swc_lab"
-    manual_lm_df = l_measure_swc_dir(swc_dir, img_dir)
+        swc_dir = "/data/kfchen/trace_ws/paper_auto_human_neuron_recon/swc_label/1um_swc_lab"
+        manual_lm_df = l_measure_swc_dir(swc_dir, img_dir)
 
-    comp_lm_df = get_comp_l_measure_df(auto_lm_df, manual_lm_df)
+        comp_lm_df = get_comp_l_measure_df(auto_lm_df, manual_lm_df)
+        # save comp_lm_df
+        comp_lm_df.to_csv(result_comp_lm_df_file, index=False)
+
+    # print full df
+    pd.set_option('display.max_rows', None)  # 不限制显示行数
+    # pd.set_option('display.max_columns', None)  # 不限制显示列数
+    pd.set_option('display.width', None)  # 自动调整宽度
+    pd.set_option('display.max_colwidth', None)  # 显示列的最大宽度
     print(comp_lm_df)
 
     plot_comp_l_measure_df(comp_lm_df)

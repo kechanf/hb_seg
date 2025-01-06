@@ -106,6 +106,7 @@ if __name__ == '__main__':
     mutineuron_list = pd.read_csv(mutineuron_list_file)['id'].tolist()
     train_val_list_file = "/data/kfchen/trace_ws/paper_trace_result/train_val_list.csv"
     train_val_list = pd.read_csv(train_val_list_file)['id'].tolist()
+    total_recon_list = pd.read_csv("/data/kfchen/trace_ws/paper_trace_result/csv_copy/final_recon_list.csv")['id'].tolist()
 
     important_feasures = ['N_stem', 'Number of Branches', 'Number of Tips', 'Total Length']
     meaningful_feasures = ['N_stem', 'Number of Bifurcatons', 'Number of Branches', 'Number of Tips',
@@ -121,6 +122,7 @@ if __name__ == '__main__':
     data = pd.read_csv(l_measure_result_file)
     # 根据样本编号筛选行（例如，样本编号以 'A' 开头）
     filtered_data = data[(~data['ID'].isin(mutineuron_list)) & (data['ID'].isin(train_val_list))]
+    # filtered_data = data[(data['ID'].isin(total_recon_list))]
     print(len(filtered_data))
     filtered_data = filtered_data[meaningful_feasures]
     # features = filtered_data.drop(columns=['ID'])
@@ -129,7 +131,7 @@ if __name__ == '__main__':
 
     l_measure_result_file = "/data/kfchen/trace_ws/paper_trace_result/nnunet/proposed_9k/8_estimated_radius_swc_l_measure.csv"
     data = pd.read_csv(l_measure_result_file)
-    filtered_data = data[(~data['ID'].isin(mutineuron_list)) & (~data['ID'].isin(train_val_list))]
+    filtered_data = data[(data['ID'].isin(total_recon_list)) & (~data['ID'].isin(train_val_list))]
     filtered_data = filtered_data[meaningful_feasures]
     print(len(filtered_data))
     # features = filtered_data.drop(columns=['ID'])

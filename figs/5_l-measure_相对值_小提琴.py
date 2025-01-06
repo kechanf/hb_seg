@@ -17,7 +17,6 @@ from tqdm import tqdm
 from simple_swc_tool.swc_io import read_swc
 
 from nnUNet.scripts.mip import get_mip_swc, get_mip
-from nnUNet.nnunetv2.dataset_conversion.generate_nnunet_dataset import augment_gamma
 import tifffile
 import numpy as np
 import pingouin as pg
@@ -195,16 +194,19 @@ def plot_violin(df_a, df_b, violin_file=None, labels=['GS', 'Auto'],
     df_b = df_b.sort_values(by='ID')
 
 
+    length_weighted_lm_file = "/data/kfchen/trace_ws/paper_trace_result/nnunet/newcel_0.1/comp_lm_df.csv"
+    lw_df = pd.read_csv(length_weighted_lm_file)
+
 
     feature_name_maps = {
-        'Number of Branches': 'No. of Branches',
+        'Number of Branches': 'No. of Branches*',
         'Total Length': 'Length',
         'Max Path Distance': 'Max Path Dist. (μm)',
         'N_stem': 'No. of Stems',
-        'Number of Tips': 'No. of Tips',
+        'Number of Tips': 'No. of Tips*',
         'Max Branch Order': 'Max Branch Order',
         'N_node': 'No. of Nodes',
-        'Number of Bifurcatons': 'No. of Bifurcations',
+        'Number of Bifurcatons': 'No. of Bifurcations*',
         'Overall Width': 'Width',
         'Overall Height': 'Height',
         'Overall Depth': 'Depth',
@@ -217,7 +219,7 @@ def plot_violin(df_a, df_b, violin_file=None, labels=['GS', 'Auto'],
     cols = 11
     rows = (num_features + cols - 1) // cols
     # fig, axes = plt.subplots(rows, cols, figsize=(cols * 2, 4 * rows), dpi=300)  # 调整figsize和dpi提高清晰度
-    fig = plt.figure(figsize=(7, 5), dpi=300)
+    fig = plt.figure(figsize=(6, 4), dpi=300)
     # axes = axes.flatten()
 
     df_a['Type'], df_b['Type'] = labels
@@ -226,8 +228,10 @@ def plot_violin(df_a, df_b, violin_file=None, labels=['GS', 'Auto'],
 
 
     bugn_colors = plt.get_cmap('BuGn')
-    # bugn 0.5-0.6
-    colors = [plt.get_cmap('YlOrBr')(x) for x in np.linspace(0.2, 0.3, len(feature_names))]
+    # yellow
+    # colors = [plt.get_cmap('YlOrBr')(x) for x in np.linspace(0.2, 0.3, len(feature_names))]
+    # green
+    colors = [plt.get_cmap('BuGn')(x) for x in np.linspace(0.2, 0.3, len(feature_names))]
 
     posision = np.arange(11)
     plt.legend().set_visible(False)
@@ -236,15 +240,22 @@ def plot_violin(df_a, df_b, violin_file=None, labels=['GS', 'Auto'],
         # ax = axes[idx]
         ax = fig
 
-        # 筛选当前特征的数据
-        feature_data = df_long[df_long['Feature'] == feature]
-        # print(len(feature_data))
+        if(feature == 'Number of Branches'):
+            data_comp = lw_df["Length_Weighted_Number_of_Branches"].to_numpy()
+        elif(feature == 'Number of Tips'):
+            data_comp = lw_df["Length_Weighted_Number_of_Tips"].to_numpy()
+        elif(feature == 'Number of Bifurcatons'):
+            data_comp = lw_df["Length_Weighted_Number_of_Bifurcatons"].to_numpy()
+        else:
+            # 筛选当前特征的数据
+            feature_data = df_long[df_long['Feature'] == feature]
+            # print(len(feature_data))
 
-        # 计算人工标注和自动重建结果的相关系数
-        type_a_values = feature_data[feature_data['Type'] == labels[0]]['Value'].to_numpy().astype(float)
-        type_b_values = feature_data[feature_data['Type'] == labels[1]]['Value'].to_numpy().astype(float)
+            # 计算人工标注和自动重建结果的相关系数
+            type_a_values = feature_data[feature_data['Type'] == labels[0]]['Value'].to_numpy().astype(float)
+            type_b_values = feature_data[feature_data['Type'] == labels[1]]['Value'].to_numpy().astype(float)
 
-        data_comp = type_a_values / type_b_values
+            data_comp = type_a_values / type_b_values
 
 
         for i in range(1):
@@ -276,8 +287,16 @@ def plot_violin(df_a, df_b, violin_file=None, labels=['GS', 'Auto'],
                         )
         xticks = [feature_name_maps[f] for f in feature_names]
 
-        plt.xticks(posision, xticks, rotation=45, fontsize=15, ha='right')
+        plt.xticks(posision, xticks, rotation=45, fontsize=13, ha='right')
+        # plt.yticks(fontsize=13)
+
+        # 轴线的粗细
+        plt.gca().spines['left'].set_linewidth(1)
+        plt.gca().spines['bottom'].set_linewidth(1)
+
         plt.axhline(y=1, color='gray', linestyle='--', linewidth=1)
+        plt.axhline(y=0.9, color='gray', linestyle='--', linewidth=1)
+        plt.axhline(y=1.1, color='gray', linestyle='--', linewidth=1)
 
         # 关闭上面和右边的坐标轴
         plt.gca().spines['top'].set_visible(False)
@@ -287,7 +306,7 @@ def plot_violin(df_a, df_b, violin_file=None, labels=['GS', 'Auto'],
         # 关闭legend
 
     # ytick 15
-    plt.yticks(fontsize=12)
+    plt.yticks(fontsize=13)
     # 隐藏不需要的子图
     plt.tight_layout()  #
     # plt.show()

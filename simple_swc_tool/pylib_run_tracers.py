@@ -16,10 +16,12 @@ import numpy as np
 import timeout_decorator
 
 from multiprocessing.pool import Pool
+from joblib import Parallel, delayed
+from tqdm import tqdm
 
 
 class BaseTracer(object):
-    DEFAULT_TIMEOUT = 300
+    DEFAULT_TIMEOUT = 7200
 
     def __init__(self, vaa3d_path=None, timeout=None):
         self.vaa3d_path = vaa3d_path
@@ -33,13 +35,44 @@ class BaseTracer(object):
 
     # @timeout_decorator.timeout(DEFAULT_TIMEOUT)
     def run(self, cmd_str):
+        process = None
+        out = ''
         try:
-            out = subprocess.check_output(cmd_str, timeout=self.timeout, shell=True)
+            # 启动子进程并获取进程句柄
+            process = subprocess.Popen(cmd_str, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+
+            # 等待进程在指定时间内完成
+            out, err = process.communicate(timeout=self.timeout)
+
         except subprocess.TimeoutExpired:
-            print(f'Time expired error for cmd: cmd_str')
+            # 超时错误，关闭进程
+            if process:
+                print(f'Time expired error for cmd: {cmd_str}')
+                process.kill()  # 终止正在运行的进程
+                out, err = process.communicate()  # 获取进程输出和错误信息
+            else:
+                print(f'No process found for cmd: {cmd_str}')
+            out = ''  # 超时返回空输出
+
+        except subprocess.CalledProcessError as e:
+            # 其他错误，输出错误信息
+            print(f'Error for cmd: {cmd_str}')
+            print(e.output)
             out = ''
+
+        except Exception as e:
+            # 捕获其他异常
+            print(f'Unexpected error for cmd: {cmd_str}')
+            print(str(e))
+            out = ''
+
         finally:
-            out = ''
+            if process:
+                process.stdout.close()
+                process.stderr.close()
+            if(process.poll() is None):
+                process.terminate()
+
         return out
 
 
@@ -532,6 +565,7 @@ class TracingRunner(object):
                     prefix = os.path.splitext(imgname)[0]
                     outfile = os.path.join(trace_dir, f'{prefix}.swc')
                     if len(glob.glob(os.path.join(trace_dir, f'{prefix}*swc'))) > 0:
+                        print(f'{prefix} already exists!')
                         continue
                     args_list.append((tracer, imgfile, outfile))
             else:
@@ -547,6 +581,7 @@ class TracingRunner(object):
                         prefix = os.path.splitext(imgname)[0]
                         outfile = os.path.join(out_path, f'{prefix}.swc')
                         if len(glob.glob(os.path.join(out_path, f'{prefix}*swc'))) > 0:
+                            print(f'{prefix} already exists!')
                             continue
                         args_list.append((tracer, imgfile, outfile))
 
@@ -554,18 +589,25 @@ class TracingRunner(object):
 
         print(f'Number of files to process: {len(args_list)}')
 
-        pt = Pool(nprocessors)
-        pt.starmap(self.wrapper_func_in_tracer_file, args_list)
-        pt.close()
-        pt.join()
+        # pt = Pool(nprocessors)
+        # pt.starmap(self.wrapper_func_in_tracer_file, args_list)
+        # pt.close()
+        # pt.join()
+
+        # for args in args_list:
+        #     self.wrapper_func_in_tracer_file(*args)
+
+        Parallel(n_jobs=nprocessors)(delayed(self.wrapper_func_in_tracer_file)(*args) for args in tqdm(args_list))
+
 
 
 if __name__ == '__main__':
     data_name = 'images'
-    imgdir = f"/data/kfchen/trace_ws/topology_test/512_seg" # test set
-    outdir = f'/data/kfchen/trace_ws/topology_test/ori_trace_result/from_seg_full'
+    imgdir = f"/data/kfchen/trace_ws/to_gu/sample_test_img" # test set
+    outdir = f'/data/kfchen/trace_ws/to_gu/classics_recon_result'
 
     vaa3d_path = '/home/kfchen/Vaa3D_CentOS_64bit_v3.601/bin/start_vaa3d.sh'
+    vaa3d_path = 'xvfb-run -a -s "-screen 0 640x480x16" ' + vaa3d_path
     file_ext = 'tif'
     with_subdir = False
     distinguish_str = ''
@@ -573,12 +615,18 @@ if __name__ == '__main__':
     if not os.path.exists(outdir):
         os.mkdir(outdir)
 
-    tracers = ['APP1', 'APP2', 'MOST', 'NEUTUBE', 'SNAKE', 'SimpleTracing1',
+    origin_tracers = ['APP1', 'APP2', 'MOST', 'NEUTUBE', 'SNAKE', 'SimpleTracing1',
               'SimpleTracing2', 'SimpleTracing3', 'TreMap', 'MST',
               'NeuroGPSTree', 'FMST', 'MeanShift', 'CWlab11', 'LCM_boost', 'NeuroStalker',
               'nctuTW', 'tips_GD', 'SimpleAxisAnalyzer', 'NeuronChaser', 'smartTracing',
               'neutu_autotrace', 'Advantra', 'RegMST', 'EnsembleNeuronTracer',
               'EnsembleNeuronTracerV2n', 'EnsembleNeuronTracerV2s', 'threeDTraceSWC']
+    tracers = ['APP2', 'MOST', 'NEUTUBE', 'SNAKE',
+              'TreMap', 'MST',
+              'NeuroGPSTree',
+              'SimpleAxisAnalyzer', 'NeuronChaser',
+              'Advantra']
+    
     # tracers = ['APP1', 'APP2', 'MOST', 'NEUTUBE', 'SNAKE', 'SimpleTracing1',
     #           'SimpleTracing2', 'SimpleTracing3', 'TreMap', 'MST',
     #           'NeuroGPSTree', 'MeanShift', 'CWlab11', 'LCM_boost', 'NeuroStalker',
@@ -592,7 +640,7 @@ if __name__ == '__main__':
     # tracers = ['APP2_NEW1', 'Advantra2', 'NeuronChaser2']
     # FMST is very memory-intensive!
     # tips_GD, threeDTraceSWC, EnsembleNeuronTracer are problematic
-    nprocessors = 6
+    nprocessors = 8
 
     tr = TracingRunner(vaa3d_path, tracers)
     tr.run_in_tracer_file(imgdir, outdir, nprocessors, with_subdir=with_subdir, file_ext=file_ext,

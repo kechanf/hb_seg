@@ -23,7 +23,10 @@ from scipy.ndimage import label
 from nnUNet.scripts.resolution_unifier import xy_resolution
 from nnUNet.scripts.test2 import MAX_PROCESSES
 from cc3d import connected_components
-
+import tifffile
+from joblib import Parallel, delayed
+# gaussian_filter1d
+from scipy.ndimage import gaussian_filter1d
 
 MAX_PROCESSERS = 16
 
@@ -150,6 +153,53 @@ def fig_2(i_dist_total_list, config=1, fig_file="fig2.png"):
     plt.savefig(r"/data/kfchen/trace_ws/gamma_trans_test/" + fig_file)
     plt.close()
 
+
+def fig_2_norm(i_dist_total_list, config=1, fig_file="fig2.png"):
+    print("shape", np.array(i_dist_total_list).shape)
+    print(i_dist_total_list[0])
+    if(config==1):
+        plt.figure(figsize=(5, 3), dpi=300)
+    else:
+        plt.figure(figsize=(4, 3), dpi=300)
+    # sns.lineplot(x=np.linspace(0, 1, 100), y=mi_hist_sum1/np.max(mi_hist_sum1), color='black', label='origin')
+    # sns.lineplot(x=np.linspace(0, 1, 100), y=mi_hist_sum2/np.max(mi_hist_sum2), color='red', label='gamma')
+
+    bins = 100
+
+    if (config == 1):
+        # full
+        plt.xlim(0.01, 1)
+        plt.ylim(0, 255)
+    elif (config == 2):
+        # low
+        plt.xlim(0.01, 0.1)
+        plt.ylim(0, 255)
+    # middle
+    elif (config == 3):
+        plt.xlim(0.1, 0.3)
+        plt.ylim(0, 80)
+    x_ = np.linspace(0, 1, bins)
+    for i in range(len(label_list)):
+        sns.lineplot(x=x_, y=i_dist_total_list[i] / np.sum(hist_total_list[0]),
+                     color=color_list[i], label=mapped_label[i])
+        # print(i_dist_total_list[i] / np.sum(hist_total_list[0]))
+    plt.title('')
+    plt.xlabel('Norm. dist. to soma', fontsize=14)
+    plt.ylabel("Mean voxel value\nin spherical shell", fontsize=14)
+    plt.tick_params(axis='both', which='major', labelsize=14)
+    plt.legend().set_visible(False)
+    # plt.legend(frameon=False, loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=2)
+    # plt.subplots_adjust(bottom=0.2)
+
+    # 关闭上面和右边的边框
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+
+    # 二值化 binarize
+    fig = plt.gcf()  # 获取当前图形对象
+    fig.tight_layout()
+    plt.savefig(r"/data/kfchen/trace_ws/gamma_trans_test/" + fig_file)
+    plt.close()
 
 def fig_3(bia_size_total_list, config=1, fig_file="fig3_1.png"):
     if(config==1):
@@ -535,6 +585,7 @@ def get_total_list():
     hist_total_list = [np.zeros(256) for i in range(len(current_label))]
     i_dist_total_list = [np.zeros(max_dist_from_soma) for i in range(len(current_label))]
     bia_size_total_list = [np.zeros(256) for i in range(len(current_label))]
+    norm_i_dist_total_list = [np.zeros(100) for i in range(len(current_label))]
 
     pbar = tqdm(total=len(tif_img_files))
     foloder_list = [down_sample_tif_dir, diff_gamma_tif_dir, equalize_tif_dir, gamma_tif_dir, truncated_gamma_tif_dir, truncated_diff_gamma_tif_dir]
@@ -542,7 +593,6 @@ def get_total_list():
     temp_resized_tif_dir = r"/data/kfchen/trace_ws/gamma_trans_test/resized_tif"
 
     def current_task(file_name, folder_list):
-
         down_sample_r = 2
         origin_shape = io.imread(os.path.join(folder_list[0], file_name)).shape
         # print(origin_shape)
@@ -552,7 +602,7 @@ def get_total_list():
         soma_coord = [int(f * xy_resolution / 1000 / down_sample_r) for f in soma_coord]
         soma_coord = (soma_coord[0], soma_coord[1], soma_coord[2])
 
-        img_list = []
+        img_list = [] # 存的是这一个图像经过不同方法处理后的图像
 
         for f in folder_list:
             temp_current_image_file = os.path.join(temp_resized_tif_dir, file_name.replace(".tif", "_") + os.path.basename(f) + str(down_sample_r) + "_.tif")
@@ -591,11 +641,14 @@ def get_total_list():
 
 
         # 更新直方图和平均强度值
+        # 这个list记录的是这一个图像，在几种方法处理后的各项指标
         local_hist_list = [np.zeros(256) for _ in range(len(current_label))]
         local_i_dist_sum = [np.zeros(max_dist_from_soma) for _ in range(len(current_label))]
+        local_norm_i_dist_sum = [np.zeros(100) for _ in range(len(current_label))]
         local_bia_size_list = [np.zeros(256) for _ in range(len(current_label))]
 
         for i, img in enumerate(img_list):
+            print(img.shape)
             current_hist, _ = np.histogram(img.ravel(), bins=256, range=(0, 256), density=True)
             local_hist_list[i] += current_hist
             print("histogram done")
@@ -607,7 +660,29 @@ def get_total_list():
             else:
                 current_mean_intensity = np.load(temp_current_mean_intensity_file)
             local_i_dist_sum[i] += current_mean_intensity
-            # print(current_mean_intensity[:5])
+
+            # 归一化结果
+            temp_current_norm_i_dist_sum_file = os.path.join(temp_resized_tif_dir, file_name.replace(".tif", "_") + os.path.basename(folder_list[i]) + str(down_sample_r) + "_norm_i_dist.npy")
+            if(not os.path.exists(temp_current_norm_i_dist_sum_file)):
+                current_mean_intensity = current_mean_intensity[1:]
+                max_dist = 0
+                for j in range(len(current_mean_intensity)):
+                    if(current_mean_intensity[j] > 0):
+                        max_dist = j
+                print(f"max_dist: {max_dist}")
+                current_norm_i_dist_sum = np.zeros(100)
+                for j in range(100):
+                    mi = np.mean(current_mean_intensity[int(j / 100 * max_dist):int((j + 1) / 100 * max_dist)])
+                    # is nan
+                    if(not np.isnan(mi)):
+                        current_norm_i_dist_sum[j] = mi
+                    else:
+                        mi = 0
+                        print(f"dist: {int(j / 100 * max_dist)}-{int((j + 1) / 100 * max_dist)}", f"mean: {mi}")
+                np.save(temp_current_norm_i_dist_sum_file, current_norm_i_dist_sum)
+            else:
+                current_norm_i_dist_sum = np.load(temp_current_norm_i_dist_sum_file)
+            local_norm_i_dist_sum[i] += current_norm_i_dist_sum
             print("distance transform done")
 
             temp_current_bia_size_file = os.path.join(temp_resized_tif_dir, file_name.replace(".tif", "_") + os.path.basename(folder_list[i]) + str(down_sample_r) + "_bia_size.npy")
@@ -620,7 +695,7 @@ def get_total_list():
             print("bia size done")
 
         # print(local_hist_list[0][:10], local_i_dist_sum[0][:10])
-        return local_hist_list, local_i_dist_sum, local_bia_size_list
+        return local_hist_list, local_i_dist_sum, local_bia_size_list, local_norm_i_dist_sum
 
     # for file_name in tif_img_files:
     #     local_hist_list, local_i_dist_list, local_bia_size_list = current_task(file_name, foloder_list)
@@ -637,13 +712,15 @@ def get_total_list():
 
 
     for file_name in tif_img_files:
-        local_hist_list, local_i_dist_list, local_bia_size_list = current_task(file_name, foloder_list)
+        local_hist_list, local_i_dist_list, local_bia_size_list, local_norm_i_dist_sum = current_task(file_name, foloder_list)
 
         # # 更新全局变量
         for i in range(len(current_label)):
             hist_total_list[i] += local_hist_list[i]
             i_dist_total_list[i] += local_i_dist_list[i]
             bia_size_total_list[i] += local_bia_size_list[i]
+            norm_i_dist_total_list[i] += local_norm_i_dist_sum[i]
+
 
     pbar.close()
 
@@ -654,7 +731,215 @@ def get_total_list():
         np.save(os.path.join(save_dir, 'hist_total_' + current_label[i] + '.npy'), hist_total_list[i])
         np.save(os.path.join(save_dir, 'i_dist_total_' + current_label[i] + '.npy'), i_dist_total_list[i])
         np.save(os.path.join(save_dir, 'bia_size_total_' + current_label[i] + '.npy'), bia_size_total_list[i])
+        np.save(os.path.join(save_dir, 'norm_i_dist_total_' + current_label[i] + '.npy'), norm_i_dist_total_list[i])
 
+def prepare_down_sample_rescaled_swc():
+    source_swc_dir = "/data/kfchen/trace_ws/paper_auto_human_neuron_recon/swc_label/1um_swc_lab"
+    target_swc_dir = "/data/kfchen/trace_ws/paper_auto_human_neuron_recon/swc_label/1um_swc_lab_down_sample_2"
+    if(not os.path.exists(target_swc_dir)):
+        os.makedirs(target_swc_dir)
+        swc_files = [f for f in os.listdir(source_swc_dir) if f.endswith(".swc")]
+        for swc_file in swc_files:
+            with open(os.path.join(source_swc_dir, swc_file), 'r') as f:
+                lines = f.readlines()
+            with open(os.path.join(target_swc_dir, swc_file), 'w') as f:
+                for line in lines:
+                    if line.startswith("#"):
+                        f.write(line)
+                    else:
+                        line = line.split(' ')
+                        line[2] = str(float(line[2]) / 2)
+                        line[3] = str(float(line[3]) / 2)
+                        line[4] = str(float(line[4]) / 2)
+                        f.write(' '.join(line))
+
+def traverse_from_soma(swc_df, img):
+    # 找到soma节点（通常是type == 1）
+    soma_node = swc_df[swc_df['type'] == 1].iloc[0]
+    soma_id = soma_node['id']
+
+    # 创建一个字典来存储从每个节点到其子节点的连接关系
+    tree = {}
+    for _, row in swc_df.iterrows():
+        if row['parent'] != -1:  # parent == -1表示没有父节点（根节点）
+            if row['parent'] not in tree:
+                tree[row['parent']] = []
+            tree[row['parent']].append(row['id'])
+
+    # 存储每个节点到soma的路径距离和直线距离
+    distance_to_soma = {soma_id: 0.0}  # soma到自己的距离为0
+    straight_line_distance = {soma_id: 0.0}  # soma到自己的直线距离为0
+    img_value = {soma_id: img[int(soma_node['z']), int(soma_node['y']), int(soma_node['x'])]}
+    visited = set()  # 记录已访问的节点
+
+    # 计算两个节点之间的欧氏距离
+    def euclidean_distance(p1, p2):
+        return np.sqrt((p1['x'] - p2['x']) ** 2 + (p1['y'] - p2['y']) ** 2 + (p1['z'] - p2['z']) ** 2)
+
+    # 深度优先搜索DFS，从soma开始遍历
+    def dfs(node_id, current_distance, current_straight_distance):
+        # 遍历该节点的所有子节点
+        if node_id in visited:
+            return
+
+        visited.add(node_id)
+
+        # 获取当前节点的信息
+        current_node = swc_df[swc_df['id'] == node_id].iloc[0]
+
+        # 记录当前节点到soma的路径距离（路径总和）和直线距离
+        distance_to_soma[node_id] = current_distance
+        straight_line_distance[node_id] = current_straight_distance
+        z, y, x = int(current_node['z']), int(current_node['y']), int(current_node['x'])
+        z, y, x = min(max(z, 0), img.shape[0]-1), min(max(y, 0), img.shape[1]-1), min(max(x, 0), img.shape[2]-1)
+        img_value[node_id] = img[z, y, x]
+
+        # 遍历所有子节点
+        if node_id in tree:
+            for child_id in tree[node_id]:
+                # 计算从当前节点到子节点的直线距离
+                child_node = swc_df[swc_df['id'] == child_id].iloc[0]
+                edge_distance = euclidean_distance(current_node, child_node)
+                # 递归调用DFS，累加路径距离和直线距离
+                dfs(child_id, current_distance + edge_distance, euclidean_distance(soma_node, child_node))
+
+    # 从soma节点开始遍历
+    dfs(soma_id, 0.0, 0.0)
+
+    swc_df['path_dist'] = np.nan
+    swc_df['euclidean_dist'] = np.nan
+    swc_df['image_intensity'] = np.nan
+    for node_id in distance_to_soma:
+        swc_df.loc[swc_df['id'] == node_id, 'path_dist'] = distance_to_soma[node_id]
+        swc_df.loc[swc_df['id'] == node_id, 'euclidean_dist'] = straight_line_distance[node_id]
+        swc_df.loc[swc_df['id'] == node_id, 'image_intensity'] = img_value[node_id]
+
+    # return distance_to_soma, straight_line_distance, img_value
+    return swc_df
+
+def calc_skel_intensity_distribution_file(img_file, swc_file, save_file):
+    # print(save_file)
+    if os.path.exists(save_file):
+        swc_df = pd.read_csv(save_file)
+        return swc_df['path_dist'], swc_df['image_intensity']
+
+    img = tifffile.imread(img_file).astype(np.float32)
+    img = (img - img.min()) / (img.max() - img.min()) * 255
+    # img = np.flip(img, axis=1)
+
+    swc_df = pd.read_csv(swc_file, sep=' ', header=None, comment='#',
+                     names=['id', 'type', 'x', 'y', 'z', 'radius', 'parent'],
+                     dtype={'id': int, 'type': int, 'x': float, 'y': float, 'z': float, 'radius': float, 'parent': int})
+
+    try:
+        swc_df = traverse_from_soma(swc_df, img)
+    except:
+        print(f"Error in {swc_file}")
+        swc_df['path_dist'] = np.nan
+        swc_df['image_intensity'] = np.nan
+
+    swc_df.to_csv(save_file, index=False)
+    # print(swc_df['path_dist'][:5])
+    # print(swc_df['image_intensity'][:5])
+
+    return swc_df['path_dist'], swc_df['image_intensity']
+
+def calc_skel_intensity_distribution_dir(img_dir, swc_dir, save_dir):
+    img_files = [f for f in os.listdir(img_dir) if f.endswith('.tif')]
+    # for img_file in img_files:
+    #     swc_file = os.path.join(swc_dir, img_file.replace('.tif', '.swc'))
+    #     save_file = os.path.join(save_dir, img_file.replace('.tif', '.csv'))
+    #     calc_skel_intensity_distribution_file(os.path.join(img_dir, img_file), swc_file, save_file)
+    Parallel(n_jobs=MAX_PROCESSERS)(
+        delayed(calc_skel_intensity_distribution_file)(
+            os.path.join(img_dir, img_file),
+            os.path.join(swc_dir, img_file.replace('.tif', '.swc')),
+            os.path.join(save_dir, img_file.replace('.tif', '.csv'))
+        ) for img_file in tqdm(img_files)
+    )
+
+def calc_skel_intensity_distribution_for_trans():
+    img_root = "/data/kfchen/trace_ws/gamma_trans_test"
+    trans_methods = ['raw', 'diff_gamma', 'equalize', 'gamma_05', 'truncated_gamma_05']
+    swc_dir = "/data/kfchen/trace_ws/gamma_trans_test/down_sample_242_swc"
+
+    for trans_method in trans_methods:
+        if(trans_method == 'raw'):
+            img_dir = os.path.join(img_root, f"down_sample_242_tif")
+        else:
+            img_dir = os.path.join(img_root, f"down_sample_242_{trans_method}")
+        save_dir = os.path.join("/data/kfchen/trace_ws/gamma_trans_test/temp_skel_instensity", trans_method)
+        if(not os.path.exists(save_dir)):
+            os.makedirs(save_dir)
+        calc_skel_intensity_distribution_dir(img_dir, swc_dir, save_dir)
+
+
+def plt_fig1(num_bins=1000):
+    trans_methods = ['raw', 'diff_gamma', 'truncated_gamma_05', 'gamma_05', 'equalize']
+    result_root = "/data/kfchen/trace_ws/gamma_trans_test/temp_skel_instensity"
+    result_dirs = [os.path.join(result_root, f) for f in trans_methods]
+
+    path_dists = [[] for _ in range(len(trans_methods))]
+    image_intensities = [[] for _ in range(len(trans_methods))]
+    for i, result_dir in enumerate(result_dirs):
+        result_files = [f for f in os.listdir(result_dir) if f.endswith('.csv')]
+        for result_file in result_files:
+            df = pd.read_csv(os.path.join(result_dir, result_file))[['path_dist', 'image_intensity']]
+            df = df.dropna()
+            current_path_dist, current_image_intensity = df['path_dist'], df['image_intensity']
+            current_path_dist = current_path_dist / np.max(current_path_dist) * num_bins
+            current_path_dist = [int(i) for i in current_path_dist]
+            current_image_intensity = (current_image_intensity - current_image_intensity.min()) / (
+                        current_image_intensity.max() - current_image_intensity.min()) * 255
+            if (len(current_image_intensity) == 0 or current_image_intensity[0] < 255 * 0.5):
+                continue
+            path_dists[i].extend(current_path_dist)
+            image_intensities[i].extend(current_image_intensity)
+
+
+    # hist
+    # 设置清晰度
+    plt.rcParams['figure.dpi'] = 300
+    color_list = plt.cm.get_cmap('Set3').colors
+    set2_colors = [(0, 0, 0), color_list[3], color_list[6], color_list[2], color_list[4]]
+    plt.figure(figsize=(4, 3))
+
+    mean_intensities = []
+    for i in range(len(trans_methods)):
+        df = pd.DataFrame({
+            'path_dist': np.array(path_dists[i]).astype(np.float32) / num_bins,
+            'image_intensity': image_intensities[i]
+        })
+        average_intensities = df.groupby('path_dist')['image_intensity'].mean().reset_index()
+        mean_intensities.append(average_intensities)
+
+    for i in range(len(mean_intensities)):
+        current_x, current_y = mean_intensities[i]['path_dist'], mean_intensities[i]['image_intensity']
+        # 平滑y
+        current_y = gaussian_filter1d(current_y, sigma=2)
+        plt.plot(current_x, current_y,
+                 color=set2_colors[i], linewidth=1)
+
+    plt.xlim(0, 1)
+    plt.ylim(0, 255)
+
+    plt.xlabel('Norm. path dist. to soma', fontsize=15)
+    plt.ylabel('Voxel value', fontsize=15)
+    # tick
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    # plt.title('Path Distance to Soma vs Image Intensity')
+    # legend
+    # plt.legend(['Dye-injection', 'Genetic labeling'], fontsize=12, frameon=False)
+    # plt.legend(['Raw', 'Diffusion-based adaptive gamma', 'Histogram equalization', 'Global gamma', 'Truncated gamma'],
+    #             fontsize=12, frameon=False)
+    plt.tight_layout()
+    # plt.colorbar(label='Image Intensity')
+    # plt.show()
+    plt.savefig("/data/kfchen/trace_ws/gamma_trans_test/temp_skel_instensity/Path_Distance_to_Soma_vs_Image_Intensity.png")
+    plt.close()
 
 # def update_pbar(pbar, value):
 #     pbar.update(value)
@@ -730,8 +1015,12 @@ def get_total_list():
 #     pbar.close()
 
 
-hist_total_list, i_dist_total_list, bia_size_total_list = [], [], []
+hist_total_list, i_dist_total_list, bia_size_total_list, norm_i_dist_total_list = [], [], [], []
 # get_total_list()
+prepare_down_sample_rescaled_swc()
+calc_skel_intensity_distribution_for_trans()
+plt_fig1()
+exit()
 
 label_list = ['raw', 'diff_gamma_05_1', 'truncated_gamma_05', 'gamma_05', 'equalize']
 # label_map = {
@@ -744,10 +1033,14 @@ label_list = ['raw', 'diff_gamma_05_1', 'truncated_gamma_05', 'gamma_05', 'equal
 mapped_label = ['Raw', 'DAGT', 'DTGT', 'Gamma trans.', 'Hist. equalization']
 color_list = plt.cm.get_cmap('Set3').colors
 color_list = [(0, 0, 0), color_list[3], color_list[6], color_list[2], color_list[4]]
+
+bins = 100
+
 for i in range(len(label_list)):
     hist_total_list.append(np.load(os.path.join(save_dir, 'hist_total_'  + label_list[i] + '.npy')))
     i_dist_total_list.append(np.load(os.path.join(save_dir, 'i_dist_total_' + label_list[i] + '.npy')))
     bia_size_total_list.append(np.load(os.path.join(save_dir, 'bia_size_total_' + label_list[i] + '.npy')))
+    norm_i_dist_total_list.append(np.load(os.path.join(save_dir, 'norm_i_dist_total_' + label_list[i] + '.npy')))
 # print(hist_total_list)
 # print(i_dist_total_list)
 # print(bia_size_total_list)
@@ -771,11 +1064,14 @@ for i in range(len(label_list)):
 
 
 
-fig_1(hist_total_list)
+# fig_1(hist_total_list)
 
-fig_2(i_dist_total_list, 1, "fig2_1_full.png")
-fig_2(i_dist_total_list, 2, "fig2_2_low_focus.png")
-fig_2(i_dist_total_list, 3, "fig2_3_middle_focus.png")
+# fig_2(i_dist_total_list, 1, "fig2_1_full.png")
+# fig_2(i_dist_total_list, 2, "fig2_2_low_focus.png")
+# fig_2(i_dist_total_list, 3, "fig2_3_middle_focus.png")
+fig_2_norm(norm_i_dist_total_list, 1, "fig2_1_full_norm.png")
+fig_2_norm(norm_i_dist_total_list, 2, "fig2_2_low_focus_norm.png")
+fig_2_norm(norm_i_dist_total_list, 3, "fig2_3_middle_focus_norm.png")
 
-fig_3(bia_size_total_list, 1, "fig3_1_full.png", )
-fig_3(bia_size_total_list, 2, "fig3_2_foucs.png")
+# fig_3(bia_size_total_list, 1, "fig3_1_full.png", )
+# fig_3(bia_size_total_list, 2, "fig3_2_foucs.png")

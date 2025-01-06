@@ -204,27 +204,54 @@ manual_ids = df_manual["ID"].values
 shared_ids = set(auto_ids) & set(manual_ids)
 
 foucs_feature = [
-    "Number of Branches", 'Total Length',
+    "Number of Branches",
+    # 'Total Length',
 ]
 # sample_threshold_max, sample_threshold_min, sample_threshold_step = 1.05, 0.8, 0.05
 # sample_threshold_points = np.arange(sample_threshold_min, sample_threshold_max+sample_threshold_step, sample_threshold_step)
 sample_threshold_points = [0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2]
 print(sample_threshold_points)
 
+chosen_sample = {
+    "Number of Branches": {
+        0.6: 2478,
+        0.7: 3517,
+        0.8: 2768,
+        0.9: 2928,
+        1.0: 3342,
+        1.1: 2436,
+    },
+    "Total Length": {
+    }
+}
+
 threshold = 0.8
 for feature in foucs_feature:
     good_samples = []
-    for id in shared_ids:
-        auto_value = df_auto[df_auto["ID"] == id][feature].values[0]
-        manual_value = df_manual[df_manual["ID"] == id][feature].values[0]
-        # if(auto_value > threshold * manual_value):
-        good_samples.append((id, auto_value, manual_value, auto_value/manual_value))
-    # good_samples = sorted(good_samples, key=lambda x: x[3], reverse=False)
+    if(feature == "Number of Branches"):
+        length_weighted_lm_file = "/data/kfchen/trace_ws/paper_trace_result/nnunet/newcel_0.1/comp_lm_df.csv"
+        df_length_weighted_lm = pd.read_csv(length_weighted_lm_file)
+        df_length_weighted_lm = df_length_weighted_lm[df_length_weighted_lm["id"].isin(shared_ids)]
+        for id in shared_ids:
+            length_weighted_value = df_length_weighted_lm[df_length_weighted_lm["id"] == id]["Length_Weighted_Number_of_Branches"].values[0]
+            # if(auto_value > threshold * manual_value):
+            good_samples.append((id, 0, 0, length_weighted_value))
+    else:
+        for id in shared_ids:
+            auto_value = df_auto[df_auto["ID"] == id][feature].values[0]
+            manual_value = df_manual[df_manual["ID"] == id][feature].values[0]
+            # if(auto_value > threshold * manual_value):
+            good_samples.append((id, auto_value, manual_value, auto_value/manual_value))
+        # good_samples = sorted(good_samples, key=lambda x: x[3], reverse=False)
 
     random_samples = []
+
     for i in range(len(sample_threshold_points)-1):
         threshold1 = sample_threshold_points[i]
         threshold2 = sample_threshold_points[i+1]
+        if(threshold1 in chosen_sample[feature]):
+            random_samples.append((chosen_sample[feature][threshold1], 0, 0, 0))
+            continue
         current_random_samples = []
         for sample in good_samples:
             if(threshold1 <= sample[3] < threshold2 or (i == 1 and sample[3] < threshold2)):

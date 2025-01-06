@@ -6,6 +6,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 
+
 def get_final_id_list(final_recon_list_file = r"/data/kfchen/trace_ws/paper_trace_result/final_recon_list.csv"):
 
     if(not os.path.exists(final_recon_list_file)):
@@ -125,7 +126,7 @@ def get_unlabeled_list(unlabeled_recon_list_file = r"/data/kfchen/trace_ws/paper
     return final_id_list
 
 def get_new_neuron_info():
-    def get_ids_from_csv(file_path=r"/data/kfchen/trace_ws/paper_trace_result/final_recon_list.csv"): # 从最终重建获取id
+    def get_ids_from_csv(file_path=r"/data/kfchen/trace_ws/paper_trace_result/csv_copy/final_recon_list.csv"): # 从最终重建获取id
         # 读取 CSV 文件
         df = pd.read_csv(file_path)
 
@@ -185,6 +186,16 @@ def get_new_neuron_info():
         final_df = pd.DataFrame(results, columns=['id', 'patient_id', 'tissue_id', 'gender', 'age', 'brain_region', 'slice_thickness'])
         return final_df
 
+    def check_tissue(final_df):
+        unique_tissue_brain_pairs = final_df[['tissue_id', 'patient_id']].drop_duplicates()
+        # print(unique_tissue_brain_pairs)
+
+        # 统计不同的组织编号与脑区的组合数
+        num_unique_tissue_brain_pairs = unique_tissue_brain_pairs.shape[0]
+
+        # 打印结果
+        # print(f"样本中有 {num_unique_tissue_brain_pairs} 个不同的组织编号（与病人组合）。")
+        print(f"组织块总数：{num_unique_tissue_brain_pairs}")
     ids = get_ids_from_csv()
     patient_tissue_df = get_patient_and_tissue_info(ids)
     final_df = get_additional_info_from_excel(patient_tissue_df)
@@ -192,18 +203,26 @@ def get_new_neuron_info():
     # sort
     final_df = final_df.sort_values(by=['id'])
     final_df_file = r"/data/kfchen/trace_ws/paper_trace_result/csv_copy/final_neuron_info.csv"
+
+    # print(final_df)
+    unique_slice_thickness = final_df['slice_thickness'].unique()
+    slice_thickness_count = final_df['slice_thickness'].value_counts()
+    percentage = slice_thickness_count / slice_thickness_count.sum()
+    sorted_slice_thickness_count = slice_thickness_count.sort_values(ascending=False)
+    print("切片厚度统计（按数量排序）：")
+    for thickness in sorted_slice_thickness_count.index:
+        # 取得切片厚度的数量和百分比
+        count = slice_thickness_count.get(thickness, 0)  # 防止某个厚度没有出现
+        perc = percentage.get(thickness, 0)  # 防止某个厚度没有出现
+        print(f"{thickness}: {count}, {perc * 100:.2f}%")
+
+    check_tissue(final_df)
+
+    print("dont save")
+    return
     if(os.path.exists(final_df_file)):
         os.remove(final_df_file)
     final_df.to_csv(final_df_file, index=False)
-    # print(final_df)
-    unique_slice_thickness = final_df['slice_thickness'].unique()
-    print(unique_slice_thickness)
-    print(len(unique_slice_thickness))
-    # 统计各个切片厚度的数量和百分比
-    slice_thickness_count = final_df['slice_thickness'].value_counts()
-    percentage = slice_thickness_count / slice_thickness_count.sum()
-    # slice_thickness_count = final_df['slice_thickness'].value_counts()
-    print(slice_thickness_count, percentage)
 
     # sort by id
     final_df = final_df.sort_values(by=['id'])
@@ -229,10 +248,14 @@ def get_total_length(final_df_file):
 
 def check_gender(final_df_file):
     final_df = pd.read_csv(final_df_file)
-    print(final_df.shape)
+    # print(final_df.shape)
     patient_id = final_df['patient_id'].tolist()
+    # print(len(patient_id))
+
     patient_id = list(set(patient_id))
-    print(len(patient_id))
+    patient_id.sort()
+    # print(len(patient_id))
+    # print(patient_id)
 
     patient_info_file = r"/data/kfchen/trace_ws/paper_trace_result/csv_copy/sample_info10302024.xlsx"
     df = pd.read_excel(patient_info_file)
@@ -264,13 +287,184 @@ def check_gender(final_df_file):
         else:
             female_patient.append(i)
 
-    print(len(male_patient))
-    print(len(female_patient))
+    # print(len(male_patient))
+    # print(len(female_patient))
+    print(f"男性病人: {len(male_patient)}， 占比： {len(male_patient) / len(patient_id) * 100:.2f}%")
+    print(f"女性病人: {len(female_patient)}， 占比： {len(female_patient) / len(patient_id) * 100:.2f}%")
+    print(f"总病人数: {len(patient_id)}")
+
+def fuck_cc_bn():
+    # train_list_file = "/data/kfchen/trace_ws/paper_trace_result/csv_copy/train_val_list.csv"
+    # test_list_file = "/data/kfchen/trace_ws/paper_trace_result/csv_copy/test_list_with_gs.csv"
+    # train_list = pd.read_csv(train_list_file)['id'].tolist() + pd.read_csv(test_list_file)['id'].tolist()
+
+    neuron_info_file = "/data/kfchen/trace_ws/paper_trace_result/csv_copy/final_neuron_info.csv"
+    neuron_info = pd.read_csv(neuron_info_file)
+    # brain_regions = neuron_info[neuron_info['id'].isin(train_list)]['brain_region'].tolist()
+    brain_regions = neuron_info[['id', 'brain_region']]
+
+    # 初始化样本列表
+    sample_count = {
+        'CB_tonsil.L': [],
+        'BN.L': [],
+        'CC.L': [],
+    }
+
+    # 遍历每一行，统计样本编号
+    for index, row in brain_regions.iterrows():
+        brain_region = row['brain_region']
+        id = row['id']
+
+        if brain_region in sample_count:
+            sample_count[brain_region].append(id)
+
+    # 打印每个脑区的样本编号列表
+    for region, ids in sample_count.items():
+        print(f'{region}: {ids}')
+
+    to_kill_ids = sample_count['CC.L'] + sample_count['BN.L'] + sample_count['CB_tonsil.L']
+    # 整理文件
+    print(f"to kill: {len(to_kill_ids)}")
+
+    todo_files = [
+        "/data/kfchen/trace_ws/paper_trace_result/csv_copy/test_list_with_gs.csv",
+        "/data/kfchen/trace_ws/paper_trace_result/csv_copy/train_val_list.csv",
+        "/data/kfchen/trace_ws/paper_trace_result/csv_copy/final_recon_list.csv",
+        "/data/kfchen/trace_ws/paper_trace_result/csv_copy/unlabeled_list.csv",
+        "/data/kfchen/trace_ws/paper_trace_result/csv_copy/final_neuron_info.csv",
+    ]
+    for file in todo_files:
+        df = pd.read_csv(file)
+        print(f"{file}: {df.shape}")
+        df = df[~df['id'].isin(to_kill_ids)]
+        print(f"{file}: {df.shape}")
+        df.to_csv(file, index=False)
+
+def check_slice():
+    meta_info_file = "/data/kfchen/trace_ws/meta_hb_50114.xlsx"
+    meta_info = pd.read_excel(meta_info_file)
+
+    total_recon_list_file = "/data/kfchen/trace_ws/paper_trace_result/csv_copy/final_neuron_info.csv"
+    total_recon_list = pd.read_csv(total_recon_list_file)['id'].tolist()
+
+    meta_info = meta_info[meta_info['cell_id'].isin(total_recon_list)][['patient_number', "tissue_block_number", "slice_number"]]
+    print(len(meta_info))
+    unique_pairs = meta_info.drop_duplicates()
+    print("切片总数：")
+    print(f"unique_pairs(slice): {len(unique_pairs)}")
+    # print(meta_info)
+
+    dead_patient = ["P00002"]
+    meta_info = meta_info[meta_info['patient_number'].isin(dead_patient)]
+    print(f"dead_patient sample: {len(meta_info)}")
+
+def check_tissue():
+    meta_info_file = "/data/kfchen/trace_ws/meta_hb_50114.xlsx"
+    meta_info = pd.read_excel(meta_info_file)
+
+    total_recon_list_file = "/data/kfchen/trace_ws/paper_trace_result/csv_copy/final_neuron_info.csv"
+    total_recon_list = pd.read_csv(total_recon_list_file)['id'].tolist()
+
+    meta_info = meta_info[meta_info['cell_id'].isin(total_recon_list)][['patient_number', "tissue_block_number"]]
+    print(len(meta_info))
+    unique_pairs = meta_info.drop_duplicates()
+    print("组织块总数：")
+    print(f"unique_pairs(tissue): {len(unique_pairs)}")
 
 
+def fuck_nk():
+    final_df_file = r"/data/kfchen/trace_ws/paper_trace_result/csv_copy/final_neuron_info.csv"
+    final_df = pd.read_csv(final_df_file)
+    recon_patient_id = final_df['patient_id'].tolist()
+    recon_patient_id = list(set(recon_patient_id))
+    recon_patient_id = [int(f[1:]) for f in recon_patient_id]
+    recon_patient_id = ["P" + str(f).zfill(5) for f in recon_patient_id]
 
+    print(len(recon_patient_id))
+    print(recon_patient_id)
+
+    patient_info_file = "/data/kfchen/trace_ws/patient_info.xlsx"
+
+    patient_info_df = pd.read_excel(patient_info_file)
+
+    sample_id = patient_info_df[patient_info_df['patient_number'].isin(recon_patient_id)]['sample_id'].tolist()
+    final_df['sample_id'] = final_df['patient_id'].apply(
+        lambda x: patient_info_df.loc[patient_info_df['patient_number'] == ("P" + str(int(x[1:])).zfill(5)), 'sample_id'].values[0]
+        if len(patient_info_df.loc[patient_info_df['patient_number'] == ("P" + str(int(x[1:])).zfill(5)), 'sample_id'].values) > 0
+        else None)
+    final_df['hospital'] = final_df['sample_id'].apply(lambda x: str(x).split("-")[1] if x is not None else None)
+    #
+    # hospital_list = [str(f.split("-")[1]) for f in sample_id]
+    # print(hospital_list)
+    # hospital_list = list(set(hospital_list))
+    # print(len(hospital_list))
+    # print(hospital_list)
+
+    banned_hospital_list = ['NK']
+
+    hostpital_count = final_df['hospital'].value_counts()
+    print(hostpital_count)
+    banned_list = final_df[final_df['hospital'].isin(banned_hospital_list)]
+    print(f"banned: {banned_list}")
+
+    train_val_file = "/data/kfchen/trace_ws/paper_trace_result/csv_copy/train_val_list.csv"
+    test_val_file = "/data/kfchen/trace_ws/paper_trace_result/csv_copy/test_list_with_gs.csv"
+    train_list = pd.read_csv(train_val_file)['id'].tolist() + pd.read_csv(test_val_file)['id'].tolist()
+    test_val = pd.read_csv(test_val_file)['id'].tolist()
+    to_kill_ids = banned_list['id'].tolist()
+
+
+    print(f"train test in banned: {len(set(train_list).intersection(set(banned_list['id'].tolist())))}")
+    print(f"test in banned: {len(set(test_val).intersection(set(banned_list['id'].tolist())))}")
+
+    #
+    # banned_patient_id = patient_info_df[patient_info_df['sample_id'].str.contains('|'.join(banned_hospital_list))]['patient_number'].tolist()
+    # banned_patient_id = list(set(banned_patient_id))
+    # # recon_patient_id & banned_patient_id
+    # banned_patient_id = list(set(recon_patient_id).intersection(set(banned_patient_id)))
+    # print(len(banned_patient_id))
+    # banned_patient_id = ["P" + str(int(f[1:])).zfill(3) for f in banned_patient_id]
+    # print(f"banned_patient_id: {banned_patient_id}")
+    #
+    # banned_recon = final_df[final_df['patient_id'].isin(banned_patient_id)]
+    # print(len(banned_recon))
+
+    # NK: 233
+    # JSP: 1343
+    # JZ: 318
+
+    todo_files = [
+        "/data/kfchen/trace_ws/paper_trace_result/csv_copy/test_list_with_gs.csv",
+        "/data/kfchen/trace_ws/paper_trace_result/csv_copy/train_val_list.csv",
+        "/data/kfchen/trace_ws/paper_trace_result/csv_copy/final_recon_list.csv",
+        "/data/kfchen/trace_ws/paper_trace_result/csv_copy/unlabeled_list.csv",
+        "/data/kfchen/trace_ws/paper_trace_result/csv_copy/final_neuron_info.csv",
+    ]
+    for file in todo_files:
+        df = pd.read_csv(file)
+        print(f"{file}: {df.shape}")
+        df = df[~df['id'].isin(to_kill_ids)]
+        print(f"{file}: {df.shape}")
+        df.to_csv(file, index=False)
+
+    '''
+    /data/kfchen/trace_ws/paper_trace_result/csv_copy/test_list_with_gs.csv: (242, 1)
+    /data/kfchen/trace_ws/paper_trace_result/csv_copy/test_list_with_gs.csv: (242, 1)
+    /data/kfchen/trace_ws/paper_trace_result/csv_copy/train_val_list.csv: (1100, 1)
+    /data/kfchen/trace_ws/paper_trace_result/csv_copy/train_val_list.csv: (1100, 1)
+    /data/kfchen/trace_ws/paper_trace_result/csv_copy/final_recon_list.csv: (8639, 1)
+    /data/kfchen/trace_ws/paper_trace_result/csv_copy/final_recon_list.csv: (8406, 1)
+    /data/kfchen/trace_ws/paper_trace_result/csv_copy/unlabeled_list.csv: (7297, 1)
+    /data/kfchen/trace_ws/paper_trace_result/csv_copy/unlabeled_list.csv: (7064, 1)
+    /data/kfchen/trace_ws/paper_trace_result/csv_copy/final_neuron_info.csv: (8639, 8)
+    /data/kfchen/trace_ws/paper_trace_result/csv_copy/final_neuron_info.csv: (8406, 8)
+    '''
 
 if __name__ == "__main__":
+
+    # fuck_cc_bn()
+    # fuck_nk()
+    # exit()
 
     # get_final_id_list()
     # get_unlabeled_list()
@@ -278,11 +472,20 @@ if __name__ == "__main__":
 
     final_df_file = r"/data/kfchen/trace_ws/paper_trace_result/csv_copy/final_neuron_info.csv"
     check_gender(final_df_file)
-    exit()
-    if(not os.path.exists(final_df_file)):
-        get_new_neuron_info()
+    # 检查来自多少个病人、组织
+    # check_fi  g1_info(final_df_file)
+    # 检查切片厚度
 
-    get_total_length(final_df_file)
+    get_new_neuron_info()
+    check_slice()
+    check_tissue()
+    # exit()
+    # if(not os.path.exists(final_df_file)):
+    #     get_new_neuron_info()
+    #
+    # get_total_length(final_df_file)
+
+
 
 
 

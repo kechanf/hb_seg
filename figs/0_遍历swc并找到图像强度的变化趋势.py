@@ -688,9 +688,11 @@ def prepare_seu1876_new():
         joblib.Parallel(n_jobs=N_JOBS)(joblib.delayed(compute_forground_info)(os.path.join(target_img_dir, swc_file.replace('.swc', '.tif')),
                                                                               os.path.join(mask_dir, swc_file.replace('.swc', '.tif')),
                                                                               os.path.join(foreground_info_dir, swc_file.replace('.swc', '.npy'))) for swc_file in tqdm(swc_files))
-def plt_fig1():
+def plt_fig1(num_bins=1000):
     ex_human_swc_dir = "/data/kfchen/trace_ws/img_noise_test/proposed/extended_swc"
-    ex_mouse_eswc_dir = "/data/kfchen/trace_ws/img_noise_test/seu1876/extended_swc_from_eswc"
+    # ex_mouse_eswc_dir = "/data/kfchen/trace_ws/img_noise_test/seu1876/extended_swc_from_eswc"
+    ex_mouse_eswc_dir = "/data/kfchen/trace_ws/img_noise_test/seu1876/extended_swc"
+
     human_files = [f for f in os.listdir(ex_human_swc_dir) if f.endswith('.csv')]
     mouse_files = [f for f in os.listdir(ex_mouse_eswc_dir) if f.endswith('.csv')]
 
@@ -699,6 +701,8 @@ def plt_fig1():
     for human_file in human_files:
         df = pd.read_csv(os.path.join(ex_human_swc_dir, human_file))
         current_path_dist, current_image_intensity = df['path_dist'], df['image_intensity']
+        # current_path_dist = [int(i) for i in current_path_dist]
+        current_path_dist = current_path_dist / np.max(current_path_dist) * num_bins
         current_path_dist = [int(i) for i in current_path_dist]
         current_image_intensity = (current_image_intensity - current_image_intensity.min()) / (
                     current_image_intensity.max() - current_image_intensity.min()) * 255
@@ -711,6 +715,7 @@ def plt_fig1():
         df = df.dropna()
 
         current_path_dist, current_image_intensity = df['path_dist'], df['image_intensity']
+        current_path_dist = current_path_dist / np.max(current_path_dist) * num_bins
         current_path_dist = [int(i) for i in current_path_dist]
         current_image_intensity = (current_image_intensity - current_image_intensity.min()) / (
                     current_image_intensity.max() - current_image_intensity.min()) * 255
@@ -718,7 +723,6 @@ def plt_fig1():
             continue
         path_dists[1].extend(current_path_dist)
         image_intensities[1].extend(current_image_intensity)
-    print(len(path_dists[0]), len(path_dists[1]))
 
     # hist
     # 设置清晰度
@@ -726,12 +730,12 @@ def plt_fig1():
     set2_colors = plt.cm.get_cmap('Set2').colors
     plt.figure(figsize=(4, 3))
     df = pd.DataFrame({
-        'path_dist': path_dists[0],
+        'path_dist': np.array(path_dists[0]).astype(np.float32) / num_bins, #float(path_dists[0])/num_bins,
         'image_intensity': image_intensities[0]
     })
     human_average_intensities = df.groupby('path_dist')['image_intensity'].mean().reset_index()
     df = pd.DataFrame({
-        'path_dist': path_dists[1],
+        'path_dist': np.array(path_dists[1]).astype(np.float32) / num_bins,
         'image_intensity': image_intensities[1]
     })
     mouse_average_intensities = df.groupby('path_dist')['image_intensity'].mean().reset_index()
@@ -764,17 +768,20 @@ def plt_fig1():
     # plt.plot(mouse_x, mouse_fit_y, label="Mouse Fit", color='skyblue', linewidth=2)
 
     # 折线
+
     plt.plot(human_average_intensities['path_dist'], human_average_intensities['image_intensity'], color=set2_colors[0])
     plt.plot(mouse_average_intensities['path_dist'], mouse_average_intensities['image_intensity'], color=set2_colors[1])
+    # print(human_average_intensities['image_intensity'][-10:])
+    # print(mouse_average_intensities['image_intensity'][-10:])
 
-    plt.xlim(0, 500)
+    plt.xlim(0, 1)
     plt.ylim(0, 255)
 
     # plt.scatter(average_intensities['path_dist'], average_intensities['image_intensity'], alpha=0.5, c=average_intensities['image_intensity'], cmap='viridis')
     # kde
     # sns.kdeplot(x=path_dists, y=image_intensities, cmap='viridis', shade=True, cbar=True)
 
-    plt.xlabel('Path dist. to soma', fontsize=15)
+    plt.xlabel('Norm. path dist. to soma', fontsize=15)
     plt.ylabel('Voxel value', fontsize=15)
     # tick
     plt.xticks(fontsize=12)
@@ -783,9 +790,10 @@ def plt_fig1():
     plt.gca().spines['right'].set_visible(False)
     # plt.title('Path Distance to Soma vs Image Intensity')
     # legend
-    plt.legend(['Human', 'Mouse'], fontsize=12, frameon=False)
+    plt.legend(['Dye-injection', 'Genetic labeling'], fontsize=12, frameon=False)
     plt.tight_layout()
     # plt.colorbar(label='Image Intensity')
+    # plt.show()
     plt.savefig("/data/kfchen/trace_ws/img_noise_test/Path_Distance_to_Soma_vs_Image_Intensity.png")
     plt.close()
 
@@ -959,7 +967,7 @@ def plt_fig3():
     # plt.ylim(-0.0005, 0.008)
     # plt.ylim(0.0192, 0.020)
     plt.xlabel('Voxel value', fontsize=15)
-    plt.ylabel('Frequency', fontsize=15)
+    plt.ylabel('Proportion', fontsize=15)
     plt.yticks(fontsize=12)
     plt.xticks(fontsize=12)
     # 关闭上边框和右边框

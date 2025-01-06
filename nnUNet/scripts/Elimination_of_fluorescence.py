@@ -402,6 +402,7 @@ def visualize_result(img_file, xy_resolution, result_img_file, mip_file):
 
     best_sigma_map, best_sigma = find_best_sigma_map(img, soma)
     best_sigma_map = resize(best_sigma_map, origin_img_shape, order=3, preserve_range=True, anti_aliasing=False).astype(best_sigma_map.dtype)
+    # tifffile.imwrite(result_img_file.replace('.tif', '_gamma_map.tif'), best_sigma_map)
     result_img = deflu_gamma(origin_img, best_sigma_map)
 
     result_img = ((result_img - result_img.min()) / (result_img.max() - result_img.min()) * 255).astype("uint8")
@@ -639,6 +640,8 @@ def main_for_14k():
 
     df = pd.read_csv(neuron_info_file, encoding='gbk')
     img_files = [f for f in os.listdir(img_dir) if f.endswith('.tif')]
+    # img_files = [f if '3575' in f else None for f in img_files]
+    # img_files = [f for f in img_files if f != None]
     img_files = sorted(img_files, key=lambda x: int(x.split('_')[0]))
     # img_files = img_files[:50]
     # img_files = [f for f in img_files if int(f.split('_')[0]) == 3294]
