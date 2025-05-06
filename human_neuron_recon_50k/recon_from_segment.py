@@ -14,6 +14,7 @@ from skimage.morphology import skeletonize_3d
 import SimpleITK as sitk
 import sys
 
+
 from simple_swc_tool.swc_io import read_swc, write_swc
 from scipy import ndimage
 import pandas as pd
