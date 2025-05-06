@@ -260,7 +260,7 @@ def generate_14k_good_sample():
     source_tif_dir = 
 
 if __name__ == '__main__':
-    dataset_name = 'Dataset180_deflu_gamma' # 减小soma周围荧光
+    dataset_name = 'Dataset190_big_samples' # 减小soma周围荧光
     generate_dataset(dataset_name)
     move_test_data(dataset_name)
 

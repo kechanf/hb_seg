@@ -5,7 +5,6 @@ import numpy as np
 from sklearn.cluster import DBSCAN
 import networkx as nx
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 import itertools
 
 

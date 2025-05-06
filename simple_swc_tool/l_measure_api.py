@@ -18,6 +18,7 @@ from nnUNet.scripts.mip import get_mip_swc, get_mip
 from nnUNet.nnunetv2.dataset_conversion.generate_nnunet_dataset import augment_gamma
 import tifffile
 import numpy as np
+from joblib import Parallel, delayed
 
 
 def calc_global_features(swc_file, vaa3d=r'D:\Vaa3D_V4.001_Windows_MSVC_64bit\vaa3d_msvc.exe'):
@@ -623,10 +624,23 @@ def compare_tip_to_soma(traced_dir1 = r"/data/kfchen/trace_ws/result500_new_resi
     print(len(better_list))
 
 
-def l_measure_swc_file(swc_file, v3d_path = r"/home/kfchen/Vaa3D-x.1.1.4_Ubuntu/Vaa3D-x"):
-    return calc_global_features(swc_file, vaa3d=v3d_path)
+def l_measure_swc_file(swc_file, v3d_path = r"/home/kfchen/Vaa3D-x.1.1.4_Ubuntu/Vaa3D-x", save_file=None):
+    if(save_file is not None):
+        if(os.path.exists(save_file)):
+            gf_result = pd.read_csv(save_file)
+            # to map
+            gf_result = gf_result.to_dict(orient='records')[0]
+            return gf_result
+    # print("processing: ", swc_file)
+    gf_result = calc_global_features(swc_file, vaa3d=v3d_path)
+    if(gf_result is None):
+        return None
+    if(save_file is not None):
+        df = pd.DataFrame(gf_result, index=[0])
+        df.to_csv(save_file, float_format='%g', index=False)
+    return gf_result
 
-def l_measure_swc_dir(swc_dir, result_csv, v3d_path = r"/home/kfchen/Vaa3D-x.1.1.4_Ubuntu/Vaa3D-x"):
+def l_measure_swc_dir(swc_dir, result_csv, v3d_path = r"/home/kfchen/Vaa3D-x.1.1.4_Ubuntu/Vaa3D-x", save_dir=None):
     feature_names = pd.DataFrame(columns=['ID', 'N_node', 'Soma_surface', 'N_stem', 'Number of Bifurcatons',
                                          'Number of Branches', 'Number of Tips', 'Overall Width', 'Overall Height',
                                          'Overall Depth', 'Average Diameter', 'Total Length', 'Total Surface',
@@ -643,21 +657,36 @@ def l_measure_swc_dir(swc_dir, result_csv, v3d_path = r"/home/kfchen/Vaa3D-x.1.1
     # swc_files.sort()
 
     l_measure_results = []
-    swc_paths = [os.path.join(swc_dir, f) for f in swc_files]
-    progress_bar = tqdm(total=len(swc_paths), desc='Processing')
+    swc_files = [os.path.join(swc_dir, f) for f in swc_files]
+    # progress_bar = tqdm(total=len(swc_paths), desc='Processing')
+
+    if(save_dir is not None):
+        os.makedirs(save_dir, exist_ok=True)
+        save_files = [os.path.join(save_dir, os.path.split(f)[-1].replace('.swc', '.csv')) for f in swc_files]
+        l_measure_results = Parallel(n_jobs=12)(
+            delayed(l_measure_swc_file)(swc_path, v3d_path, save_file) for swc_path, save_file in
+            tqdm(zip(swc_files, save_files)))
+    else:
+        l_measure_results = Parallel(n_jobs=12)(
+            delayed(l_measure_swc_file)(swc_path, v3d_path) for swc_path in tqdm(swc_files))
+
 
     # for swc_path in swc_paths:
+    #     print("processing: ", swc_path)
     #     l_measure_results.append(l_measure_swc_file(swc_path, v3d_path))
-    #    progress_bar.update(1)
-    # 多线程
-    with ThreadPoolExecutor(max_workers=12) as executor:  # 可以根据你的系统调整 max_workers
-        future_to_files = {executor.submit(l_measure_swc_file, swc_path, v3d_path): swc_path for swc_path in swc_paths}
-        for future in as_completed(future_to_files):
-            result = future.result()
-            l_measure_results.append(result)
-            progress_bar.update(1)
+    #     progress_bar.update(1)
+    # # 多线程
+    # with ThreadPoolExecutor(max_workers=12) as executor:  # 可以根据你的系统调整 max_workers
+    #     future_to_files = {executor.submit(l_measure_swc_file, swc_path, v3d_path, save_file): swc_path, save_file for swc_path, save_file in zip(swc_paths, save_files)}
+    #     for future in as_completed(future_to_files):
+    #         result = future.result()
+    #         l_measure_results.append(result)
+    #         progress_bar.update(1)
+    #
+    # progress_bar.close()
 
-    progress_bar.close()
+    # joblib
+
 
     df_gt = pd.DataFrame(l_measure_results)
     if(df_gt.empty):

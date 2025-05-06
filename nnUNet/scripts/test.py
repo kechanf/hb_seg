@@ -940,78 +940,78 @@ def trace_app1_with_soma_folder(skelwithsoma_folder, somamarker_folder, swc_fold
 
 
 #
-# def gcut_file(file_name, name_mapping, swc_folder, gmsoma_marker_folder, gcut_folder):
-#     swc_path = os.path.join(swc_folder, file_name)
-#     gmsoma_marker_path = os.path.join(gmsoma_marker_folder, os.path.splitext(file_name)[0] + '.marker')
-#     gcutswc_path = os.path.join(gcut_folder, file_name)
-#
-#     ID = int(file_name.split('_')[0])
-#     spacing = name_mapping[name_mapping["ID"] == ID]["spacing"].values[0]
-#     spacing = float(spacing.split(',')[1])
-#
-#     point_l = read_swc(swc_path)
-#     if(len(point_l.p) <= 1):
-#         return
-#     point_l.p[1].x, point_l.p[1].y, point_l.p[1].z = int(point_l.p[1].x), int(point_l.p[1].y), int(point_l.p[1].z)
-#     # if(os.path.exists(swc_path)):
-#     #     os.remove(swc_path)
-#
-#
-#     with open(gmsoma_marker_path, 'r') as f:
-#         marker_content = f.read()
-#         res_marker_content = marker_content
-#         if(marker_content.split('\n', 1)[0][0] == '#'):
-#             marker_content = marker_content.split('\n', 1)[1]
-#         for line in marker_content.split('\n'):
-#             if(line == ""):
-#                 continue
-#             line_content = line.split(',')
-#             x, y, z = float(line_content[0]), float(line_content[1]), float(line_content[2])
-#             res_x, res_y, res_z = x, y, z
-#             min_dist = 100000
-#             for p in point_l.p:
-#                 dist = (p.x - x) ** 2 + (p.y - y) ** 2 + (p.z - z) ** 2
-#                 if(dist < 100 and p.p == -1):
-#                     res_x, res_y, res_z = int(p.x), int(p.y), int(p.z)
-#                     # point_l.p[p.n].x, point_l.p[p.n].y, point_l.p[p.n].z = int(res_x), int(res_y), int(res_z)
-#                     break
-#                 if(dist < min_dist):
-#                     min_dist = dist
-#                     res_x, res_y, res_z = int(p.x), int(p.y), int(p.z)
-#             # for p in point_l.p:
-#             #     if(p.x == res_x and p.y == res_y and p.z == res_z):
-#             #         res_x, res_y, res_z = int(res_x), int(res_y), int(res_z)
-#             #         point_l.p[p.n].x, point_l.p[p.n].y, point_l.p[p.n].z = int(res_x), int(res_y), int(res_z)
-#             #         break
-#
-#             res_marker_content += f"{res_x}, {res_y}, {res_z}, 1, 1, , , 255,0,0\n"
-#     # if(os.path.exists(gmsoma_marker_path)):
-#     #     os.remove(gmsoma_marker_path)
-#     with open(gmsoma_marker_path, 'w') as f:
-#         # print(res_marker_content)
-#         f.write(res_marker_content)
-#
-#     # Writeswc_v2(swc_path, point_l)
-#
-#     # print(swc_path, somamarker_path, gcutswc_path, spacing)
-#     try:
-#         segmentor = NeuronSegmentation(swc_path, gmsoma_marker_path, scale_z=spacing, scale_ouput_z=False)
-#         segmentor.segment()
-#         gcutswc_path = gcutswc_path[:-4]
-#         segmentor.save(gcutswc_path)
-#
-#         if os.path.isdir(gcutswc_path):
-#             files = [f for f in os.listdir(gcutswc_path) if os.path.isfile(os.path.join(gcutswc_path, f))]
-#             # sort
-#             files.sort()
-#
-#             original_file_path = os.path.join(gcutswc_path, files[0])
-#             new_file_path = os.path.join(gcut_folder, file_name)
-#             if(r"soma=1" in original_file_path):
-#                 shutil.copy(original_file_path, new_file_path)
-#             shutil.rmtree(gcutswc_path)
-#     except:
-#         pass
+def gcut_file(file_name, name_mapping, swc_folder, gmsoma_marker_folder, gcut_folder):
+    swc_path = os.path.join(swc_folder, file_name)
+    gmsoma_marker_path = os.path.join(gmsoma_marker_folder, os.path.splitext(file_name)[0] + '.marker')
+    gcutswc_path = os.path.join(gcut_folder, file_name)
+
+    ID = int(file_name.split('_')[0])
+    spacing = name_mapping[name_mapping["ID"] == ID]["spacing"].values[0]
+    spacing = float(spacing.split(',')[1])
+
+    point_l = read_swc(swc_path)
+    if(len(point_l.p) <= 1):
+        return
+    point_l.p[1].x, point_l.p[1].y, point_l.p[1].z = int(point_l.p[1].x), int(point_l.p[1].y), int(point_l.p[1].z)
+    # if(os.path.exists(swc_path)):
+    #     os.remove(swc_path)
+
+
+    with open(gmsoma_marker_path, 'r') as f:
+        marker_content = f.read()
+        res_marker_content = marker_content
+        if(marker_content.split('\n', 1)[0][0] == '#'):
+            marker_content = marker_content.split('\n', 1)[1]
+        for line in marker_content.split('\n'):
+            if(line == ""):
+                continue
+            line_content = line.split(',')
+            x, y, z = float(line_content[0]), float(line_content[1]), float(line_content[2])
+            res_x, res_y, res_z = x, y, z
+            min_dist = 100000
+            for p in point_l.p:
+                dist = (p.x - x) ** 2 + (p.y - y) ** 2 + (p.z - z) ** 2
+                if(dist < 100 and p.p == -1):
+                    res_x, res_y, res_z = int(p.x), int(p.y), int(p.z)
+                    # point_l.p[p.n].x, point_l.p[p.n].y, point_l.p[p.n].z = int(res_x), int(res_y), int(res_z)
+                    break
+                if(dist < min_dist):
+                    min_dist = dist
+                    res_x, res_y, res_z = int(p.x), int(p.y), int(p.z)
+            # for p in point_l.p:
+            #     if(p.x == res_x and p.y == res_y and p.z == res_z):
+            #         res_x, res_y, res_z = int(res_x), int(res_y), int(res_z)
+            #         point_l.p[p.n].x, point_l.p[p.n].y, point_l.p[p.n].z = int(res_x), int(res_y), int(res_z)
+            #         break
+
+            res_marker_content += f"{res_x}, {res_y}, {res_z}, 1, 1, , , 255,0,0\n"
+    # if(os.path.exists(gmsoma_marker_path)):
+    #     os.remove(gmsoma_marker_path)
+    with open(gmsoma_marker_path, 'w') as f:
+        # print(res_marker_content)
+        f.write(res_marker_content)
+
+    # Writeswc_v2(swc_path, point_l)
+
+    # print(swc_path, somamarker_path, gcutswc_path, spacing)
+    try:
+        segmentor = NeuronSegmentation(swc_path, gmsoma_marker_path, scale_z=spacing, scale_ouput_z=False)
+        segmentor.segment()
+        gcutswc_path = gcutswc_path[:-4]
+        segmentor.save(gcutswc_path)
+
+        if os.path.isdir(gcutswc_path):
+            files = [f for f in os.listdir(gcutswc_path) if os.path.isfile(os.path.join(gcutswc_path, f))]
+            # sort
+            files.sort()
+
+            original_file_path = os.path.join(gcutswc_path, files[0])
+            new_file_path = os.path.join(gcut_folder, file_name)
+            if(r"soma=1" in original_file_path):
+                shutil.copy(original_file_path, new_file_path)
+            shutil.rmtree(gcutswc_path)
+    except:
+        pass
 #
 #
 # def gcut_folder(swc_folder, gmsoma_marker_folder, gcutswc_folder):

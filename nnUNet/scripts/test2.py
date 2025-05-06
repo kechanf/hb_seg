@@ -229,10 +229,14 @@ class AutoTracePipeline(FileProcessingPipeline):
 
         data = tifffile.imread(seg_file).astype("uint8")
         data = np.flip(data, axis=1)
-        origin_size = self.get_origin_img_size()
-        data = skimage.transform.resize(data, origin_size, order=0, anti_aliasing=False)
+        # origin_size = self.get_origin_img_size()
+        origin_size = (data.shape[0] * 2, data.shape[1] * 2, data.shape[2] * 2)
+        # data = skimage.transform.resize(data, origin_size, order=0, anti_aliasing=False)
+        # data = scipy.ndimage.zoom(data, (2, 2, 2), order=0)
 
         skel = skeletonize_3d(data).astype("uint8")
+        # skel = data
+        skel = scipy.ndimage.zoom(skel, (2, 2, 2), order=0)
         # skel = binary_dilation(skel, iterations=1).astype("uint8")
         tifffile.imwrite(skel_file, skel * 255, compression='zlib')
 
@@ -303,8 +307,10 @@ class AutoTracePipeline(FileProcessingPipeline):
 
         soma_region = np.where(soma_region > 0, 1, 0).astype("uint8")
         soma_region = np.flip(soma_region, axis=1)
-        origin_size = self.get_origin_img_size()
-        soma_region = skimage.transform.resize(soma_region, origin_size, order=0, anti_aliasing=False)
+        # origin_size = self.get_origin_img_size()
+        origin_size = (soma_region.shape[0] * 2, soma_region.shape[1] * 2, soma_region.shape[2] * 2)
+        # soma_region = skimage.transform.resize(soma_region, origin_size, order=0, anti_aliasing=False)
+        soma_region = scipy.ndimage.zoom(soma_region, (2, 2, 2), order=0)
 
         tifffile.imwrite(soma_region_file, soma_region * 255, compression='zlib')
 
@@ -763,6 +769,7 @@ if __name__ == "__main__":
     loss_list = ['proposed_9k', 'baseline', 'cldice', 'skelrec', 'newcel_0.1']
     work_dir_list = [f"/data/kfchen/trace_ws/paper_trace_result/nnunet/{loss}/" for loss in loss_list]
     work_dir_list = work_dir_list[:1]
+    # work_dir_list = ["/data2/kfchen/tracing_ws/14k_raw_img_data/lone_590_test_data_for_nnunet"]
 
     for work_dir in work_dir_list:
         print(f"Processing {work_dir}")
@@ -775,19 +782,22 @@ if __name__ == "__main__":
         else:
             raw_dataset_dir = r"/data/kfchen/nnUNet/nnUNet_raw/Dataset180_deflu_gamma"
         name_mapping_file = os.path.join(raw_dataset_dir, "name_mapping.csv")
+        # name_mapping_file = "/data2/kfchen/tracing_ws/14k_raw_img_data/lone_590_test_data_for_nnunet/origin_new_id_map.csv"
 
         seg_dir = os.path.join(work_dir, "0_seg")
         neuron_info_file = "/data/kfchen/nnUNet/nnUNet_results/Dataset169_hb_10k/nnUNetTrainer__nnUNetPlans__3d_fullres/fold_0/ptls10/norm_result/Human_SingleCell_TrackingTable_20240712.csv"
 
-        if(not os.path.exists(seg_dir)):
-            prepare_seg_files(origin_seg_dir, seg_dir, name_mapping_file)
+        # if(not os.path.exists(seg_dir)):
+        prepare_seg_files(origin_seg_dir, seg_dir, name_mapping_file)
 
         print("Data preparation is done.")
         # pipeline_list = []
         # 感兴趣的文件
-        interest_files = ['02578_P021_T01_-S049_RFL_R0613_LJ-20221103_LD.tif', "02796_P025_T01_-S028_LTL_R0613_RJ-20230201_YW.tif", "06007_P031_T02_(3)-S005__RTL_R0919_YS-20230522_YW.tif", "06008_P031_T02_(3)-S005__RTL_R0919_YS-20230522_YW.tif"]
+        # interest_files = ['02578_P021_T01_-S049_RFL_R0613_LJ-20221103_LD.tif', "02796_P025_T01_-S028_LTL_R0613_RJ-20230201_YW.tif", "06007_P031_T02_(3)-S005__RTL_R0919_YS-20230522_YW.tif", "06008_P031_T02_(3)-S005__RTL_R0919_YS-20230522_YW.tif"]
+        interest_files = ['02796_P025_T01_-S028_LTL_R0613_RJ-20230201_YW.tif']
         file_names = [f for f in os.listdir(seg_dir) if f.endswith('.tif')]
         file_names = [f for f in file_names if f in interest_files]
+        print(file_names)
 
         # done_dir = "/data/kfchen/trace_ws/paper_trace_result/nnunet/proposed_9k/8_estimated_radius_swc"
         # done_files = [f.replace('.swc', '.tif') for f in os.listdir(done_dir) if f.endswith('.swc')]

@@ -4,6 +4,7 @@ import pandas as pd
 from sympy.physics.units import percent
 import seaborn as sns
 import matplotlib.pyplot as plt
+from simple_swc_tool.l_measure_api import l_measure_swc_dir
 
 
 
@@ -341,7 +342,8 @@ def fuck_cc_bn():
         df.to_csv(file, index=False)
 
 def check_slice():
-    meta_info_file = "/data/kfchen/trace_ws/meta_hb_50114.xlsx"
+    # meta_info_file = "/data/kfchen/trace_ws/meta_hb_50114.xlsx"
+    ???
     meta_info = pd.read_excel(meta_info_file)
 
     total_recon_list_file = "/data/kfchen/trace_ws/paper_trace_result/csv_copy/final_neuron_info.csv"
@@ -359,7 +361,8 @@ def check_slice():
     print(f"dead_patient sample: {len(meta_info)}")
 
 def check_tissue():
-    meta_info_file = "/data/kfchen/trace_ws/meta_hb_50114.xlsx"
+    # meta_info_file = "/data/kfchen/trace_ws/meta_hb_50114.xlsx"
+    ???
     meta_info = pd.read_excel(meta_info_file)
 
     total_recon_list_file = "/data/kfchen/trace_ws/paper_trace_result/csv_copy/final_neuron_info.csv"
@@ -460,11 +463,181 @@ def fuck_nk():
     /data/kfchen/trace_ws/paper_trace_result/csv_copy/final_neuron_info.csv: (8406, 8)
     '''
 
-if __name__ == "__main__":
+def add_long_examples():
+    long_sample_mip_dir = "/data2/kfchen/tracing_ws/14k_raw_img_data/lone_590_test_data_for_nnunet/checked_recon_mip"
+    long_sample_mip_files = [f for f in os.listdir(long_sample_mip_dir) if f.endswith(".png")]
+    long_sample_ids = [f.split("_")[0] for f in long_sample_mip_files]
+    long_sample_ids = [int(i) for i in long_sample_ids]
 
-    # fuck_cc_bn()
-    # fuck_nk()
+    long_sample_id_file = "/data2/kfchen/tracing_ws/14k_raw_img_data/lone_590_test_data_for_nnunet/final_long_sample_id.csv"
+    long_sample_id_df = pd.DataFrame(long_sample_ids, columns=["id"])
+    long_sample_id_df.to_csv(long_sample_id_file, index=False)
+
+    unlabel_list_file = "/data/kfchen/trace_ws/paper_trace_result/csv_copy/unlabeled_list.csv"
+    unlabel_list = pd.read_csv(unlabel_list_file)
+    merge_list = pd.concat([unlabel_list, long_sample_id_df])
+    merge_list.to_csv(unlabel_list_file, index=False)
+
+# 检查是否有交集
+def check_intersection():
+    csv_files = ["train_val_list.csv", "test_list_with_gs.csv", "unlabeled_list.csv"]
+    
+    set_list = []
+    for file in csv_files:
+        df = pd.read_csv(os.path.join("/data/kfchen/trace_ws/paper_trace_result/final_data_and_meta", file))
+        set_list.append(set(df['id'].tolist()))
+
+    for i in range(len(set_list)):
+        for j in range(i+1, len(set_list)):
+            print(f"{csv_files[i]} & {csv_files[j]}: {len(set_list[i].intersection(set_list[j]))}")
+
+def del_muti_neuron():
+    muti_neuron_list_file = "/data/kfchen/trace_ws/paper_trace_result/csv_copy/mutineuron_list.csv"
+    muti_neuron_list = pd.read_csv(muti_neuron_list_file)['id'].tolist()
+    csv_files = ["train_val_list.csv", "test_list_with_gs.csv", "unlabeled_list.csv"]
+
+    for file in csv_files:
+        df = pd.read_csv(os.path.join("/data/kfchen/trace_ws/paper_trace_result/final_data_and_meta", file))
+        print(f"{file}: {df.shape}")
+        df = df[~df['id'].isin(muti_neuron_list)]
+        print(f"{file}: {df.shape}")
+        df.to_csv(os.path.join("/data/kfchen/trace_ws/paper_trace_result/final_data_and_meta", file), index=False)
+
+def del_nk_neuron():
+    neuron_meta_14k_file = "/data/kfchen/trace_ws/paper_trace_result/csv_copy/Human_SingleCell_TrackingTable_20240712.csv"
+    neuron_meta_14k = pd.read_csv(neuron_meta_14k_file, encoding='gbk')
+    if('Hostpital' not in neuron_meta_14k.columns):
+        patient_info_file = "/data/kfchen/trace_ws/patient_info.xlsx"
+        patient_info_df = pd.read_excel(patient_info_file)
+        for i in range(len(neuron_meta_14k)):
+            patient_number = neuron_meta_14k.loc[i, '病人编号']
+            patient_number = "P" + str(int(patient_number[1:])).zfill(5)
+            hostpital = patient_info_df[patient_info_df['patient_number'] == patient_number]['sample_id'].values[0].split("-")[1]
+            neuron_meta_14k.loc[i, 'Hostpital'] = hostpital
+        neuron_meta_14k.to_csv(neuron_meta_14k_file, index=False, encoding='gbk')
+
+    nk_neuron_list = neuron_meta_14k[neuron_meta_14k['Hostpital'] == 'NK']['Cell ID'].tolist()
+
+    csv_files = ["train_val_list.csv", "test_list_with_gs.csv", "unlabeled_list.csv"]
+
+    for file in csv_files:
+        df = pd.read_csv(os.path.join("/data/kfchen/trace_ws/paper_trace_result/final_data_and_meta", file))
+        print(f"{file}: {df.shape}")
+        df = df[~df['id'].isin(nk_neuron_list)]
+        print(f"{file}: {df.shape}")
+        df.to_csv(os.path.join("/data/kfchen/trace_ws/paper_trace_result/final_data_and_meta", file), index=False)
+
+def del_non_cortex():
+    non_cortex_label = ['pLV.L', 'BN.L']
+    neuron_meta_14k_file = "/data/kfchen/trace_ws/paper_trace_result/csv_copy/Human_SingleCell_TrackingTable_20240712.csv"
+    neuron_meta_14k = pd.read_csv(neuron_meta_14k_file, encoding='gbk')
+    non_cortex_neuron_list = neuron_meta_14k[neuron_meta_14k['脑区'].isin(non_cortex_label)]['Cell ID'].tolist()
+
+    csv_files = ["train_val_list.csv", "test_list_with_gs.csv", "unlabeled_list.csv"]
+
+    for file in csv_files:
+        df = pd.read_csv(os.path.join("/data/kfchen/trace_ws/paper_trace_result/final_data_and_meta", file))
+        print(f"{file}: {df.shape}")
+        df = df[~df['id'].isin(non_cortex_neuron_list)]
+        print(f"{file}: {df.shape}")
+        df.to_csv(os.path.join("/data/kfchen/trace_ws/paper_trace_result/final_data_and_meta", file), index=False)
+
+def check_neuron_regions():
+    csv_files = ["train_val_list.csv", "test_list_with_gs.csv", "unlabeled_list.csv"]
+    total_neuron_id_list = []
+    for csv_file in csv_files:
+        df = pd.read_csv(os.path.join("/data/kfchen/trace_ws/paper_trace_result/final_data_and_meta", csv_file))
+        current_id_list = df['id'].tolist()
+        total_neuron_id_list.extend(current_id_list)
+
+    print(len(total_neuron_id_list)) # 9164
+
+    brain_regions = {
+        'frontal': {
+            "Frontal body": ["SFG.R", "SFG.L", "SFG"],  # 和superior frontal gyrus是同一个区域
+            "Middle frontal": ["MFG.R", "MFG", "MFG.L"],
+            "Inferior frontal": ["IFG", "IFG.R"],
+            "Frontal pole": ['FP.L', 'FP.R'],
+            "ambiguous (Frontal lobe)": ['FL.L', 'FL.R', '(X)FG', 'M(I)FG.L', 'S(M)FG.R', ],  # 后面两个是交叉脑区
+
+            # "frontal tubercle": ['FT.L'], # 不在allen的atlas里面
+        },
+        'parietal': {
+            # "superior parietal gyrus": ["SPG.R", "SPG.L", "SPG"], # 9
+            # 'inferior parietal gyrus': ["IPL", "IPL.L", 'IPL-near-AG'], # 10
+            'Supramarginal': ["IPL", "IPL.L", 'IPL-near-AG'],  # 指的应该是同一个区域
+            "Parietal": ["PL.L", "PL"],  # # 16 13 31 51
+        },
+        'temporal': {
+            "Temporal body": ["STG.R", "STG", 'STG-AP', "S(M)TG.R", 'S(M)TG.L', "MTG.R", "MTG.L", "MTG"],
+            # superior temporal gyrus
+            # "middle temporal gyrus": ["MTG.R", "MTG.L", "MTG"], # 28
+            # "inferior temporal gyrus": [], # 3
+            "Temporal pole": ["TP.R", "TP", "TP.L"],
+            "ambiguous (Temporal lobe)": ['TL.L', 'TL.R', 'S(M,I)TG', ]  # 后面三个是交叉脑区
+        },
+        'occipital': {
+            "Occipital": ['OL.L', 'OL.R']
+        },
+        "ambiguous": {
+            "ambiguous": ["PL.L_OL.L", "FL_TL.L"]  # 不在allen的atlas里面
+        }
+    }
+    exist_brain_region_labels = []
+    for lobe in brain_regions.keys():
+        for region in brain_regions[lobe].keys():
+            exist_brain_region_labels.extend(brain_regions[lobe][region])
+    # print(exist_brain_region_labels)
+
+    neuron_meta_14k_file = "/data/kfchen/trace_ws/paper_trace_result/csv_copy/Human_SingleCell_TrackingTable_20240712.csv"
+    neuron_meta_14k = pd.read_csv(neuron_meta_14k_file, encoding='gbk')
+    recon_brain_region = neuron_meta_14k[neuron_meta_14k['Cell ID'].isin(total_neuron_id_list)]['脑区'].tolist()
+    recon_brain_region = list(set(recon_brain_region))
+
+    # print(recon_brain_region)
+    print(set(recon_brain_region).difference(set(exist_brain_region_labels)))
+    print(set(exist_brain_region_labels).difference(set(recon_brain_region)))
+
+
+def merge_age():
+    neuron_meta_14k_file = "/data/kfchen/trace_ws/paper_trace_result/csv_copy/Human_SingleCell_TrackingTable_20240712.csv"
+    neuron_meta_14k = pd.read_csv(neuron_meta_14k_file, encoding='gbk')
+    print(neuron_meta_14k.shape)
+
+    # 找到编号一样的行
+    # todo_id_list = [2398, 2399, 2400, 2401, 2402, 2403, 2404, 2405, 2406, 2412, 2413, 2414, 2415, 2421, 2422, 2423, 2424, 2425, 2426, 2427, 2428, 2558, 2559, 2560, 2561]
+    todo_p = "P024"
+    age = 49
+    neuron_meta_14k.loc[neuron_meta_14k['病人编号'] == todo_p, '年龄'] = age
+    # 合并完全相同的行
+    neuron_meta_14k = neuron_meta_14k.groupby('Cell ID').first().reset_index()
+    print(neuron_meta_14k.shape)
+
+    neuron_meta_14k.to_csv(neuron_meta_14k_file, index=False, encoding='gbk')
+
+def prepare_long_sample_l_measure():
+    swc_dir = "/data2/kfchen/tracing_ws/14k_raw_img_data/lone_590_test_data_for_nnunet/8_estimated_radius_swc"
+    result_file = swc_dir + "_l_measure.csv"
+    l_measure_swc_dir(swc_dir, result_file)
+
+
+if __name__ == "__main__":
+    # add_long_examples()
+    # prepare_long_sample_l_measure()
     # exit()
+
+    check_intersection() # ok 检查各个子数据集是否有重合
+    del_muti_neuron() # ok, 0 sample to be del 检查已选数据集中是否有多神经元的例子
+    del_nk_neuron()
+    del_non_cortex()
+
+    check_neuron_regions()
+
+    # 使用平均年龄，合并行
+    merge_age()
+
+
+    exit()
 
     # get_final_id_list()
     # get_unlabeled_list()

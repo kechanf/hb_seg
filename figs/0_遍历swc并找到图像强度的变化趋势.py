@@ -769,8 +769,8 @@ def plt_fig1(num_bins=1000):
 
     # 折线
 
-    plt.plot(human_average_intensities['path_dist'], human_average_intensities['image_intensity'], color=set2_colors[0])
-    plt.plot(mouse_average_intensities['path_dist'], mouse_average_intensities['image_intensity'], color=set2_colors[1])
+    plt.plot(human_average_intensities['path_dist'], human_average_intensities['image_intensity'], color=set2_colors[1])
+    plt.plot(mouse_average_intensities['path_dist'], mouse_average_intensities['image_intensity'], color=set2_colors[0])
     # print(human_average_intensities['image_intensity'][-10:])
     # print(mouse_average_intensities['image_intensity'][-10:])
 

@@ -999,14 +999,14 @@ def plot_box_of_swc_list(seg_metrics_files, labels, box_file):
     feature_names = ['Dice', 'Broken Points', 'Skeleton Accuracy']
     feature_name_maps = {
         'Dice': 'Dice Coefficient ↑',
-        'Broken Points': 'Broken Points ↓',
-        'Skeleton Accuracy': 'Skeleton Accuracy ↑',
+        'Broken Points': 'No. of Skel. Breaks ↓',
+        'Skeleton Accuracy': 'Skel. Accuracy ↑',
     }
 
     num_features = len(feature_names)
     cols = 3
     rows = (num_features + cols - 1) // cols
-    fig, axes = plt.subplots(rows, cols, figsize=(cols*3, 3 * rows))  # 调整figsize和dpi提高清晰度
+    fig, axes = plt.subplots(rows, cols, figsize=(cols*3, 3 * rows), dpi=300)  # 调整figsize和dpi提高清晰度
     axes = axes.flatten()
     # plt.rcParams.update({'font.size': 20})  # 更新字体大小
     # 设置字体 Arial
@@ -1048,6 +1048,7 @@ def plot_box_of_swc_list(seg_metrics_files, labels, box_file):
             ax.boxplot(current_data[i], positions=[positions[i]], widths=0.5, patch_artist=True,
                           showfliers=True, boxprops=dict(facecolor=colors[i], color='black'),
                           medianprops=dict(color='black'), flierprops=dict(marker='o', color='black', markersize=3))
+            print(f"mean {hue}: {np.mean(current_data[i])}, {np.mean(current_data[i]) - np.mean(current_data[0])}")
 
 
         # ax.set_title(feature_name_maps[feature], fontsize=15)

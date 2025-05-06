@@ -249,8 +249,8 @@ def plot1(no_immu_list, do_immu_list, save_file='/data/kfchen/trace_ws/immunohis
     plt.close()
 
 def plot2(save_file):
-    col = 6
-    row = 2
+    col = 4
+    row = 3
     fig, axes = plt.subplots(row, col, figsize=(col * 2.5, row * 3), dpi=300)
     axes = axes.flatten()
     for i, feature_name in enumerate(feature_names):
@@ -472,54 +472,62 @@ if __name__ == '__main__':
     # plt_current_sample()
     # exit()
 
-    temp_save_file = '/data/kfchen/trace_ws/immunohistochemistry_test/immunohistochemistry_list.npz'
-    if(os.path.exists(temp_save_file)):
-        data = np.load(temp_save_file)
-        do_immu_list = list(data['do_immu_list'])
-        no_immu_list = list(data['no_immu_list'])
-    else:
-        print("prepare data")
-        neuron_meta_info_file = "/data/kfchen/trace_ws/meta_hb_50114.xlsx"
-        # neuron_meta_info_df = pd.read_excel(neuron_meta_info_file)
-        neuron_meta_info_df = pd.read_excel(neuron_meta_info_file)
-        immunohistochemistry_info = neuron_meta_info_df[['cell_id', 'immunohistochemistry']]
-        do_immu_list = immunohistochemistry_info[immunohistochemistry_info['immunohistochemistry'] == '1'][
-            'cell_id'].tolist()
-        no_immu_list = immunohistochemistry_info[immunohistochemistry_info['immunohistochemistry'] == '0'][
-            'cell_id'].tolist()
-        others_list = immunohistochemistry_info[immunohistochemistry_info['immunohistochemistry'] == '--'][
-            'cell_id'].tolist()
-
-        traced_neuron_list_file = "/data/kfchen/trace_ws/paper_trace_result/csv_copy/unlabeled_list.csv"
-        traced_neuron_list = pd.read_csv(traced_neuron_list_file)['id'].tolist()
-        # print(len(traced_neuron_list))
-
-        do_immu_list = list(set(do_immu_list) & set(traced_neuron_list))
-        no_immu_list = list(set(no_immu_list) & set(traced_neuron_list))
-        np.savez(temp_save_file, do_immu_list=do_immu_list, no_immu_list=no_immu_list)
+    # temp_save_file = '/data/kfchen/trace_ws/immunohistochemistry_test/immunohistochemistry_list.npz'
+    # if(os.path.exists(temp_save_file)):
+    #     data = np.load(temp_save_file)
+    #     do_immu_list = list(data['do_immu_list'])
+    #     no_immu_list = list(data['no_immu_list'])
+    # else:
+    #     print("prepare data")
+    #     neuron_meta_info_file = "/data/kfchen/trace_ws/meta_hb_50114.xlsx"
+    #     # neuron_meta_info_df = pd.read_excel(neuron_meta_info_file)
+    #     neuron_meta_info_df = pd.read_excel(neuron_meta_info_file)
+    #     immunohistochemistry_info = neuron_meta_info_df[['cell_id', 'immunohistochemistry']]
+    #     do_immu_list = immunohistochemistry_info[immunohistochemistry_info['immunohistochemistry'] == '1'][
+    #         'cell_id'].tolist()
+    #     no_immu_list = immunohistochemistry_info[immunohistochemistry_info['immunohistochemistry'] == '0'][
+    #         'cell_id'].tolist()
+    #     others_list = immunohistochemistry_info[immunohistochemistry_info['immunohistochemistry'] == '--'][
+    #         'cell_id'].tolist()
+    #
+    #     traced_neuron_list_file = "/data/kfchen/trace_ws/paper_trace_result/csv_copy/unlabeled_list.csv"
+    #     traced_neuron_list = pd.read_csv(traced_neuron_list_file)['id'].tolist()
+    #     # print(len(traced_neuron_list))
+    #
+    #     do_immu_list = list(set(do_immu_list) & set(traced_neuron_list))
+    #     no_immu_list = list(set(no_immu_list) & set(traced_neuron_list))
+    #     np.savez(temp_save_file, do_immu_list=do_immu_list, no_immu_list=no_immu_list)
 
 
     # calc_z_slice_thickness(do_immu_list, no_immu_list)
     # calc_z_size(do_immu_list, no_immu_list)
 
-    plt_random_sample(no_immu_list, do_immu_list, neuron_meta_info_df)
-    plot1(no_immu_list, do_immu_list)
+    # plt_random_sample(no_immu_list, do_immu_list, neuron_meta_info_df)
+    # plot1(no_immu_list, do_immu_list)
 
+    meta_file = "/data/kfchen/trace_ws/paper_trace_result/final_data_and_meta_filter/meta.csv"  # origin
+    meta = pd.read_csv(meta_file, encoding='gbk')
+    do_immu_list = meta[meta['immunohistochemistry'] == 1]['cell_id'].tolist()
+    no_immu_list = meta[meta['immunohistochemistry'] == 0]['cell_id'].tolist()
+
+
+    l_measure_result_file = "/data/kfchen/trace_ws/paper_trace_result/final_data_and_meta_filter/l_measure_result.csv"
+    l_measure_result_df = pd.read_csv(l_measure_result_file)
     print(f"full w/o IHC: {len(no_immu_list)}, full w/ IHC: {len(do_immu_list)}")
     do_immu_list, no_immu_list = get_250_list(do_immu_list, no_immu_list)
     print(f"thikness=250 w/o IHC: {len(no_immu_list)}, 250 w/ IHC: {len(do_immu_list)}")
 
-    l_measure_result_file = "/data/kfchen/trace_ws/paper_trace_result/nnunet/proposed_9k/8_estimated_radius_swc_l_measure.csv"  # origin
-    l_measure_result_df = pd.read_csv(l_measure_result_file)
+
+
     do_immu_l_measure_result = l_measure_result_df[l_measure_result_df['ID'].isin(do_immu_list)]
     no_immu_l_measure_result = l_measure_result_df[l_measure_result_df['ID'].isin(no_immu_list)]
     plot2('/data/kfchen/trace_ws/immunohistochemistry_test/immunohistochemistry.png')
 
-    l_measure_result_file = "/data/kfchen/trace_ws/cropped_swc/proposed_1um_l_measure_total.csv" # cropped
-    l_measure_result_df = pd.read_csv(l_measure_result_file)
-    do_immu_l_measure_result = l_measure_result_df[l_measure_result_df['ID'].isin(do_immu_list)]
-    no_immu_l_measure_result = l_measure_result_df[l_measure_result_df['ID'].isin(no_immu_list)]
-    plot2('/data/kfchen/trace_ws/immunohistochemistry_test/immunohistochemistry_cropped.png')
+    # l_measure_result_file = "/data/kfchen/trace_ws/cropped_swc/proposed_1um_l_measure_total.csv" # cropped
+    # l_measure_result_df = pd.read_csv(l_measure_result_file)
+    # do_immu_l_measure_result = l_measure_result_df[l_measure_result_df['ID'].isin(do_immu_list)]
+    # no_immu_l_measure_result = l_measure_result_df[l_measure_result_df['ID'].isin(no_immu_list)]
+    # plot2('/data/kfchen/trace_ws/immunohistochemistry_test/immunohistochemistry_cropped.png')
 
 
 

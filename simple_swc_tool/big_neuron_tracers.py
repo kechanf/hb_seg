@@ -350,7 +350,8 @@ def NeuroGPSTree_trace_file(img_file, out_swc_file=None, v3d_path=None):
         # print(cmd)
         pass
 
-def neuTube_trace_file(img_file, out_swc_file=None, v3d_path=None):
+# v3d_path = r"/home/user/Vaa3D_CentOS_64bit_v3.601/bin/vaa3d"
+def neuTube_trace_file(img_file, out_swc_file=None, v3d_path=r"/home/kfchen/Vaa3D_CentOS_64bit_v3.601/bin/vaa3d"):
     # f'{self.vaa3d_path} -x NeuroGPSTree -f tracing_func -i {infile} -p 1 1 1 10
     out_swc_file, _ = trace_init("neuTube", img_file, out_swc_file=out_swc_file, somamarker_file=None)
     if (os.path.exists(out_swc_file)): return
@@ -359,7 +360,7 @@ def neuTube_trace_file(img_file, out_swc_file=None, v3d_path=None):
     cmd = f'xvfb-run -a -s "-screen 0 640x480x16" {v3d_path} -x neuTube -f neutube_trace -i {img_file} -p 1 1'
 
     env = os.environ.copy()
-    ld_library_path = v3d_path[:-6]  # '/home/kfchen/Vaa3D_CentOS_64bit_v3.601/bin'
+    ld_library_path = v3d_path[:-6]  # '/home/user/Vaa3D_CentOS_64bit_v3.601/bin'
     env['LD_LIBRARY_PATH'] = f"{ld_library_path}:{env.get('LD_LIBRARY_PATH', '')}"
     # os.system(f"{cmd} env {env}")
     result = subprocess.run(cmd, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
@@ -368,7 +369,7 @@ def neuTube_trace_file(img_file, out_swc_file=None, v3d_path=None):
         os.rename(result_name, out_swc_file)
         # print(f"NeuroGPSTree tracing done: {out_swc_file}")
     else:
-        print(f"NeuroGPSTree tracing failed: {out_swc_file}")
+        print(f"neuTube tracing failed: {out_swc_file}")
         # print(cmd)
         pass
 

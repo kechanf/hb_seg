@@ -580,6 +580,7 @@ def prepare_data_14k():
     final_recon_info_file = "/data/kfchen/trace_ws/paper_trace_result/csv_copy/final_neuron_info.csv"
     final_recon_info = pd.read_csv(final_recon_info_file)
     ids = final_recon_info['id'].values
+    ids.append("14002")
 
     for v3d_img_dir in v3d_img_dirs:
         # walk

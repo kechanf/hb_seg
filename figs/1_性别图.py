@@ -119,9 +119,7 @@ def plot_stacked_age_gender_distribution_patient(csv_file, traced_csv_file):
 
 def plot_stacked_age_gender_distribution2(csv_file):
     # 读取 CSV 文件
-    df = pd.read_csv(csv_file)
-    total_recon_list = pd.read_csv("/data/kfchen/trace_ws/paper_trace_result/csv_copy/final_recon_list.csv")['id'].tolist()
-    df = df[df['id'].isin(total_recon_list)]
+    df = pd.read_csv(csv_file, encoding='gbk')
     print(len(df))
 
     # 检查总的性别分布
@@ -161,7 +159,7 @@ def plot_stacked_age_gender_distribution2(csv_file):
     # ax.set_title('Age and Gender Distribution (Neuron)')
     ax.set_xlabel('Age Group', fontsize=15)
     ax.set_ylabel('Number of Neurons', fontsize=15)
-    plt.xticks(rotation=45, ha='left', x=0.05)
+    plt.xticks(rotation=45, ha='center', x=0.05)
     # plt.legend(frameon=False, fontsize=12, loc='best')
     ax.legend(frameon=False, fontsize=15, loc='upper center', bbox_to_anchor=(0.5, -0.3), ncol=2)
     plt.tick_params(axis='both', which='major', labelsize=15)  # 调整刻度标签大小
@@ -204,5 +202,5 @@ def plot_stacked_age_gender_distribution2(csv_file):
     plt.close()
 # 指定 CSV 文件路径
 # csv_file = r"D:\tracing_ws\new_Human_SingleCell_TrackingTable_20240712.csv"
-neuron_info_file = r"/data/kfchen/trace_ws/paper_trace_result/csv_copy/final_neuron_info.csv"
+neuron_info_file = r"/data/kfchen/trace_ws/paper_trace_result/final_data_and_meta_filter/meta.csv"
 plot_stacked_age_gender_distribution2(neuron_info_file)

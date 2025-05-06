@@ -35,6 +35,9 @@ from scipy import ndimage
 # from nnunetv2.training.loss.fastanison import anisodiff3
 import pandas as pd
 from pylib.file_io import load_image
+import numpy as np
+from scipy.ndimage import label
+
 
 v3d_path = r"/home/kfchen/Vaa3D-x.1.1.4_Ubuntu/Vaa3D-x"
 
@@ -306,6 +309,15 @@ class SmartSomaRegionFinder():
 
         return high_freq_ratios, high_freq_averages
 
+    def largest_connected_component(self, binary_image):
+        labeled_image, num_features = label(binary_image)
+        component_sizes = np.bincount(labeled_image.ravel())
+        component_sizes[0] = 0
+        largest_component_label = np.argmax(component_sizes)
+        largest_component = (labeled_image == largest_component_label).astype(np.uint8)
+
+        return largest_component
+
     def test_soma_detectison(self, process_file_pair):
         seg_file, neuron_info_df, result_img_file = process_file_pair
 
@@ -366,6 +378,201 @@ class SmartSomaRegionFinder():
         result_open_img = morphology.opening(seg, morphology.ball(best_radius))
         result_open_img = result_open_img * seg
         result_img = resize(result_open_img, origin_img_size, order=0)
+        result_img = self.largest_connected_component(result_img)
+        result_img = np.where(result_img > 0, 1, 0).astype(np.uint8)
+        return result_img
+
+        # tifffile.imwrite(result_img_file, result_img, compression='zlib')
+
+
+
+class SmartSomaRegionFinder_v2():
+    def find_resolution(self, df, filename):
+        # print(filename)
+        # filename = filename.split('.')[0]
+        for i in range(len(df)):
+            # print(df.iloc[i, 1], filename)
+            if df.iloc[i, 1] == filename or df.iloc[i, 1] == filename.replace('.tif', ''):
+                return df.iloc[i, 3]
+        print(filename)
+        exit()
+
+    def exponential_decay(self, x, a, b, c):
+        return a * np.exp(-b * (x - 2)) + c
+
+    def calc_high_freq(self, seg, kernel_radii):
+        # 存储高频能量占比和高频幅值平均值
+        high_freq_ratios = []
+        high_freq_averages = []
+
+        for radius in kernel_radii:
+            struct = morphology.ball(radius)
+
+            # 形态学开运算
+            opened_img = morphology.opening(seg, struct)
+            opened_img = opened_img * seg
+
+            if (np.sum(opened_img) == 0):
+                break
+
+            # 提取表面网格
+            verts, faces, normals, values = measure.marching_cubes(opened_img, level=0)
+
+            # 计算傅里叶描述子
+            # 将三维表面网格展开为一维信号
+            signal = verts.flatten()
+
+            # 进行傅里叶变换
+            F = np.fft.fft(signal)
+            N = len(F)
+
+            # 计算幅值谱
+            F_magnitude = np.abs(F)
+
+            # 总能量
+            E_total = np.sum(F_magnitude ** 2)
+
+            # 设定频率阈值（例如，前10%的频率作为低频）
+            k_threshold = int(0.1 * N)
+
+            # 高频能量
+            E_high = np.sum(F_magnitude[k_threshold:] ** 2)
+
+            # 高频能量占比
+            R = E_high / E_total
+            high_freq_ratios.append(R)
+
+            # 平均高频幅值
+            A_high = np.mean(F_magnitude[k_threshold:])
+            high_freq_averages.append(A_high)
+
+        return high_freq_ratios, high_freq_averages
+
+    def calc_high_freq_gpu(self, seg, kernel_radii):
+        # from cupyx.scipy.ndimage import binary_opening
+        # 存储高频能量占比和高频幅值平均值
+        high_freq_ratios = []
+        high_freq_averages = []
+
+        for radius in kernel_radii:
+            # 使用 GPU 生成结构元素
+            struct = morphology.ball(radius)
+
+            # 将输入图像和结构元素转移到 GPU
+            seg_gpu = cp.asarray(seg)
+            struct_gpu = cp.asarray(struct)
+
+            # GPU 上的形态学开运算
+            opened_img_gpu = cupyx.scipy.ndimage.binary_opening(seg_gpu, struct_gpu)
+            opened_img_gpu = opened_img_gpu * seg_gpu
+
+            # 将结果转换回 CPU 以用于进一步处理
+            opened_img = cp.asnumpy(opened_img_gpu)
+
+            if (np.sum(opened_img) == 0):
+                break
+
+            # 提取表面网格
+            verts, faces, normals, values = measure.marching_cubes(opened_img, level=0)
+
+            # 计算傅里叶描述子
+            # 将三维表面网格展开为一维信号
+            signal = verts.flatten()
+
+            # 使用 GPU 进行傅里叶变换
+            signal_gpu = cp.asarray(signal)
+            F_gpu = cp.fft.fft(signal_gpu)
+            F_magnitude_gpu = cp.abs(F_gpu)
+
+            # 转换为 CPU 数组
+            F_magnitude = cp.asnumpy(F_magnitude_gpu)
+            N = len(F_magnitude)
+
+            # 总能量
+            E_total = np.sum(F_magnitude ** 2)
+
+            # 设定频率阈值（例如，前10%的频率作为低频）
+            k_threshold = int(0.1 * N)
+
+            # 高频能量
+            E_high = np.sum(F_magnitude[k_threshold:] ** 2)
+
+            # 高频能量占比
+            R = E_high / E_total
+            high_freq_ratios.append(R)
+
+            # 平均高频幅值
+            A_high = np.mean(F_magnitude[k_threshold:])
+            high_freq_averages.append(A_high)
+
+        return high_freq_ratios, high_freq_averages
+
+    def largest_connected_component(self, binary_image):
+        labeled_image, num_features = label(binary_image)
+        component_sizes = np.bincount(labeled_image.ravel())
+        component_sizes[0] = 0
+        largest_component_label = np.argmax(component_sizes)
+        largest_component = (labeled_image == largest_component_label).astype(np.uint8)
+
+        return largest_component
+
+    def test_soma_detectison(self, seg, xy_resolution):
+        resolution = (1, float(xy_resolution), float(xy_resolution))
+        origin_img_size = seg.shape
+        print("begin resize: ", seg.shape)
+        seg = resize(seg, (seg.shape[0] * resolution[0], seg.shape[1] * resolution[1], seg.shape[2] * resolution[2]),
+                     order=0)
+        print("end resize: ", seg.shape)
+        seg = (seg - seg.min()) / (seg.max() - seg.min())
+        seg = np.where(seg > 0, 1, 0).astype(np.uint8)
+        # 填补空洞
+        seg = ndimage.binary_fill_holes(seg).astype(int)
+
+        # 定义核半径列表
+        min_radii, max_radii = 2, 15
+        kernel_radii = np.linspace(min_radii, max_radii, 20)
+
+        high_freq_ratios, high_freq_averages = self.calc_high_freq_gpu(seg, kernel_radii)
+
+        kernel_radii = kernel_radii[:len(high_freq_ratios)]
+        if(len(kernel_radii) == 2):
+            # kernel_radii = kernel_radii + [(kernel_radii[1] + kernel_radii[0]) / 2]
+            kernel_radii = np.append(kernel_radii, (kernel_radii[1] + kernel_radii[0]) / 2)
+            print(kernel_radii)
+            high_freq_ratios, high_freq_averages = self.calc_high_freq_gpu(seg, kernel_radii)
+            print(high_freq_averages, high_freq_ratios)
+        elif(len(kernel_radii) == 1):
+            # kernel_radii = kernel_radii + [kernel_radii[0] + 0.2, kernel_radii[0] - 0.2]
+            kernel_radii = np.append(kernel_radii, kernel_radii[0] + 0.1)
+            kernel_radii = np.append(kernel_radii, kernel_radii[0] + 0.2)
+            print(kernel_radii)
+            high_freq_ratios, high_freq_averages = self.calc_high_freq_gpu(seg, kernel_radii)
+            print(high_freq_averages, high_freq_ratios)
+        elif(len(kernel_radii) == 0):
+            return None
+        high_freq_averages = np.array(high_freq_averages)
+        high_freq_averages = (high_freq_averages - high_freq_averages.min()) / (
+                    high_freq_averages.max() - high_freq_averages.min())
+        try:
+            popt, pcov = curve_fit(self.exponential_decay, kernel_radii, high_freq_averages, p0=[1, 1, 0], maxfev=10000)
+        except:
+            return None
+
+        # 生成拟合曲线数据
+        x_fit = np.linspace(kernel_radii.min(), kernel_radii.max(), 100)
+        y_fit = self.exponential_decay(x_fit, *popt)
+
+        fitted_gradients = np.gradient(y_fit, x_fit)
+        fitted_gradients = (fitted_gradients - fitted_gradients.min()) / (
+                    fitted_gradients.max() - fitted_gradients.min()) - 1
+
+
+        best_radius = x_fit[np.argmin(np.abs(fitted_gradients - 0.9))]
+
+        result_open_img = morphology.opening(seg, morphology.ball(best_radius))
+        result_open_img = result_open_img * seg
+        result_img = resize(result_open_img, origin_img_size, order=0)
+        result_img = self.largest_connected_component(result_img)
         result_img = np.where(result_img > 0, 1, 0).astype(np.uint8)
         return result_img
 

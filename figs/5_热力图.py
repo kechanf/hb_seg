@@ -12,6 +12,9 @@ from scipy.cluster.hierarchy import linkage, dendrogram
 from sklearn.metrics import adjusted_rand_score
 from scipy.cluster.hierarchy import fcluster
 
+import seaborn as sns
+from scipy import stats
+
 # 设置清晰度
 plt.rcParams['figure.dpi'] = 300
 
@@ -102,11 +105,11 @@ def compare_heat_map(manual_corr, auto_corr, comp_corr, feature_name_mapping):
 
 
 if __name__ == '__main__':
-    mutineuron_list_file = "/data/kfchen/trace_ws/paper_trace_result/mutineuron_list.csv"
-    mutineuron_list = pd.read_csv(mutineuron_list_file)['id'].tolist()
+    # mutineuron_list_file = "/data/kfchen/trace_ws/paper_trace_result/mutineuron_list.csv"
+    # mutineuron_list = pd.read_csv(mutineuron_list_file)['id'].tolist()
     train_val_list_file = "/data/kfchen/trace_ws/paper_trace_result/train_val_list.csv"
     train_val_list = pd.read_csv(train_val_list_file)['id'].tolist()
-    total_recon_list = pd.read_csv("/data/kfchen/trace_ws/paper_trace_result/csv_copy/final_recon_list.csv")['id'].tolist()
+    # total_recon_list = pd.read_csv("/data/kfchen/trace_ws/paper_trace_result/csv_copy/final_recon_list.csv")['id'].tolist()
 
     important_feasures = ['N_stem', 'Number of Branches', 'Number of Tips', 'Total Length']
     meaningful_feasures = ['N_stem', 'Number of Bifurcatons', 'Number of Branches', 'Number of Tips',
@@ -120,20 +123,16 @@ if __name__ == '__main__':
     l_measure_result_file = "/data/kfchen/trace_ws/paper_auto_human_neuron_recon/swc_label/1um_swc_lab_l_measure.csv"
     # 读取 CSV 文件
     data = pd.read_csv(l_measure_result_file)
-    # 根据样本编号筛选行（例如，样本编号以 'A' 开头）
-    filtered_data = data[(~data['ID'].isin(mutineuron_list)) & (data['ID'].isin(train_val_list))]
-    # filtered_data = data[(data['ID'].isin(total_recon_list))]
-    print(len(filtered_data))
-    filtered_data = filtered_data[meaningful_feasures]
+    filtered_data = data[meaningful_feasures]
     # features = filtered_data.drop(columns=['ID'])
     manual_corr = filtered_data.corr()
     data1 = filtered_data
 
-    l_measure_result_file = "/data/kfchen/trace_ws/paper_trace_result/nnunet/proposed_9k/8_estimated_radius_swc_l_measure.csv"
+    l_measure_result_file = "/data/kfchen/trace_ws/paper_trace_result/final_data_and_meta_filter/l_measure_result.csv"
     data = pd.read_csv(l_measure_result_file)
-    filtered_data = data[(data['ID'].isin(total_recon_list)) & (~data['ID'].isin(train_val_list))]
+    filtered_data = data[(~data['ID'].isin(train_val_list))]
     filtered_data = filtered_data[meaningful_feasures]
-    print(len(filtered_data))
+    # print(len(filtered_data))
     # features = filtered_data.drop(columns=['ID'])
     auto_corr = filtered_data.corr()
     data2 = filtered_data
@@ -143,6 +142,65 @@ if __name__ == '__main__':
     columns = [f'Feature_{i + 1}' for i in range(11)]
     df1 = pd.DataFrame(data1, columns=columns)
     df2 = pd.DataFrame(data2, columns=columns)
+
+    print(df1.shape, df2.shape)
+    print("mmanual_corr: ", manual_corr.shape, "auto_corr: ", auto_corr.shape)
+
+    # 提取上三角的值（不包括对角线）
+    corr_matrix1, corr_matrix2 = manual_corr.values, auto_corr.values
+
+    mask = np.triu_indices_from(corr_matrix1, k=1)  # k=1 跳过对角线
+    x_values = corr_matrix1[mask]
+    y_values = corr_matrix2[mask]
+
+    # 创建散点图
+    plt.figure(figsize=(4,4))
+    sns.scatterplot(x=x_values, y=y_values, alpha=0.7, s=100)
+
+    # 计算回归线 + 回归区间（预测区间）
+    sns.regplot(x=x_values, y=y_values,
+                scatter=False,
+                ci=None,  # 禁用置信区间
+                line_kws={'color': 'red', 'lw': 2, 'label': 'Regression Line'})
+    # 范围 x:-0.2-1.2
+    plt.xlim(-0.2, 1.2)
+    plt.ylim(-0.2, 1.2)
+
+    # # 手动计算预测区间
+    # x_pred = np.linspace(min(x_values), max(x_values), 100)
+    # X = sm.add_constant(x_values)  # 添加截距项
+    # model = sm.OLS(y_values, X).fit()
+    # pred = model.get_prediction(sm.add_constant(x_pred))
+    # pred_mean = pred.predicted_mean
+    # pred_ci = pred.conf_int(alpha=0.05)  # 95% 预测区间
+    #
+    # # 绘制预测区间
+    # plt.fill_between(x_pred, pred_ci[:, 0], pred_ci[:, 1],
+    #                  color='blue', alpha=0.2, label='Prediction Interval (95%)')
+
+    # 计算Pearson相关系数和p值
+    r, p = stats.pearsonr(x_values, y_values)
+
+    # 添加统计信息
+    # plt.annotate(f'Pearson r = {r:.3f}\np-value = {p:.4f}',
+    #              xy=(0.05, 0.95), xycoords='axes fraction',
+    #              bbox=dict(boxstyle='round', fc='white', alpha=0.8))
+    # Pearson r = 0.958
+
+    # 设置图形属性
+    # plt.title('Scatter Plot of Upper Triangle Correlation Values', pad=20)
+    plt.xlabel('Manual', fontsize=16)
+    plt.ylabel('Auto', fontsize=16)
+    # plt.legend()
+    # plt.grid(True, alpha=0.3)
+    # plt.axhline(0, color='black', lw=0.5)
+    # plt.axvline(0, color='black', lw=0.5)
+
+    plt.tight_layout()
+    # plt.show()
+    plt.savefig('/home/kfchen/neuron_seg_human/fig_results/fig6c_scatter_plot.png')
+
+    exit()
 
     n = df2.shape[0] - df1.shape[0]  # 计算需要复制的样本数
     df1_expanded = df1.sample(n=n, replace=True, random_state=42)

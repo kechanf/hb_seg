@@ -1,16 +1,12 @@
 import os
-import random
 import tifffile
-from monai.transforms.intensity.array import skimage
 
 from nnUNet.nnunetv2.dataset_conversion.generate_nnunet_dataset import augment_gamma
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import cv2
-from matplotlib.patches import Rectangle
 from nnUNet.scripts.mip import get_mip_swc
-from skimage.transform import resize
 
 neuron_info_df = pd.read_csv("/data/kfchen/nnUNet/nnUNet_results/Dataset169_hb_10k/nnUNetTrainer__nnUNetPlans__3d_fullres/fold_0/ptls10/norm_result/Human_SingleCell_TrackingTable_20240712.csv", encoding='gbk')
 
@@ -33,7 +29,7 @@ def find_swc(swc_dir, tif_file):
 def plot_compare_result(file_list, img_dir, seg_dirs, seg_labels, recon_dirs, recon_labels, info_file, index):
     row = 2
     col = 6
-    plt.figure(figsize=(5 * col, row * 5))
+    plt.figure(figsize=(5 * col, row * 5), dpi=800)
 
     for idx, img_file in enumerate(file_list):
         img_path = os.path.join(img_dir, img_file)
@@ -78,7 +74,7 @@ def plot_compare_result(file_list, img_dir, seg_dirs, seg_labels, recon_dirs, re
         plot_mips = [img_mip, seg_mips[0],  seg_mips[1], seg_mips[2], seg_mips[3], seg_mips[4],
                      recon_mips[0], recon_mips[1], recon_mips[2], recon_mips[3], recon_mips[4]]
 
-        crop_size = 300
+        crop_size = 200
         plot_mips = [plot_mip[default_size//2-crop_size//2:default_size//2+crop_size//2, default_size//2-crop_size//2:default_size//2+crop_size//2] for plot_mip in plot_mips]
         plot_mips[6:] = [cv2.rectangle(plot_mip, (0, 0), (plot_mip.shape[1], plot_mip.shape[0]), (0, 0, 0), 3) for plot_mip in plot_mips[6:]]
 
@@ -92,9 +88,9 @@ def plot_compare_result(file_list, img_dir, seg_dirs, seg_labels, recon_dirs, re
             # ax = plt.subplot(7, 5, i * 5 + idx + 1)
             ax.imshow(plot_mip)
             ax.axis('off')
-            if(i == 0):
-                ax.text(plot_mip.shape[1] / 2, 20, labels[i], fontsize=30, color='white', ha='center', va='top',
-                        backgroundcolor='black')
+            # if(i == 0):
+            #     ax.text(plot_mip.shape[1] / 2, 20, labels[i], fontsize=30, color='white', ha='center', va='top',
+            #             backgroundcolor='black')
 
     plt.tight_layout()
     plt.subplots_adjust(wspace=0.01, hspace=0.01)

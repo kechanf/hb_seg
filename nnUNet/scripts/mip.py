@@ -192,7 +192,7 @@ def get_mip_swc(swc_file, image, projection_direction='xy', ignore_background=Fa
     point_l = Readswc_v2(swc_file)
 
     color = (255, 0, 0)
-    thickness = 1
+    thickness = 2
 
 
 
